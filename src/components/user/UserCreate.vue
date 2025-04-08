@@ -125,6 +125,7 @@
         </div>
 
         <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
+        <button class="submit" :disabled="!submitEnabledCanvas" @click="createUserCanvas">Sign up with Canvas</button>
         <span class="register-message"><br>{{registerMessage}}<br></span>
     </div>
 </template>
@@ -132,6 +133,7 @@
 <script>
     import axios from "axios"
     import { eventBus } from "../../main"
+    import VueJwtDecode from "vue-jwt-decode";
 
     export default {
         name: "user-create",
@@ -157,6 +159,10 @@
                         && this.newUser.email.length > 0
                         && this.newUser.password.length > 0
                         && this.nbIRB!== null
+                        && ((this.needUCDIRB && this.ucdavisIRB!== null) || (!this.needUCDIRB))
+            },
+            submitEnabledCanvas: function() {
+                return this.nbIRB!== null
                         && ((this.needUCDIRB && this.ucdavisIRB!== null) || (!this.needUCDIRB))
             },
             needUCDIRB: function() {
@@ -197,6 +203,65 @@
                     } else if (msg.includes("isEmail")) {
                         this.setRegisterMessage("Please enter a valid email with the correct format, such as test@mail.com")
                     } 
+                }
+            },
+            createUserCanvas: async function() {
+                try {
+                    // Open Canvas OAuth Login Window
+                    const client_id = process.env.VUE_APP_CLIENT_ID;
+                    const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
+                    const state = encodeURIComponent(JSON.stringify({code: 123, type: "SIGN_UP"}));
+                    const scopes = encodeURIComponent("url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
+                    const main_tab = document.activeElement;
+                    const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
+                    
+                    // Wait for OAuth Login to finish
+                    const interval = setInterval(async () => {
+                        if (login_tab.closed) {
+                            clearInterval(interval);
+                            main_tab.focus();
+
+                            // Verify Login Successful
+                            const token = localStorage.getItem("nb.user");
+                            if (token == undefined) {
+                                this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
+                                return;
+                            }
+                            const decoded = VueJwtDecode.decode(token);
+                            if (decoded.access_token == undefined || decoded.user == undefined) {
+                                this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
+                                return;
+                            }
+                            
+                            // Finish registration
+                            const h1 = { headers: { Authorization: 'Bearer ' + token }}
+                            const consentRes = await axios.post(`/api/consent`, {name: 'NB', consent: this.nbIRB}, h1);
+                            const t1 = consentRes.data.token;
+                            localStorage.setItem("nb.user", t1);
+
+                            if (this.needUCDIRB) {
+                                const h2 = { headers: { Authorization: 'Bearer ' + t1 }};
+                                const consentRes = await axios.post(`/api/consent`, {name: 'UCDAVIS', consent: this.ucdavisIRB}, h2);
+                                const t2 = consentRes.data.token;
+                                localStorage.setItem("nb.user", t2);
+                            }
+                            eventBus.$emit('signin-success');
+                            this.resetForm();
+                        }
+                    }, 500); // Check every 500ms
+                } catch (error) {
+                    console.log(error)
+                    let msg = error.response.data.msg
+                    console.error(`Signup failed: ${msg}`)
+                    if (msg.includes("unique")) {
+                        if (msg.includes("username")) {
+                            this.setRegisterMessage("There is already any account configured for this username. Please use a different one, or you can use the Reset Password option to access the account.")
+                        } else if (msg.includes("email")) {
+                            this.setRegisterMessage("There is already any account configured for this email. Please use a different one, or you can use the Reset Password option to access the account.")
+                        }
+                    } else if (msg.includes("isEmail")) {
+                        this.setRegisterMessage("Please enter a valid email with the correct format, such as test@mail.com")
+                    }  
                 }
             },
             resetForm: function() {

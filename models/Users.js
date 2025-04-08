@@ -26,7 +26,7 @@ const user = (sequelize, DataTypes) => {
         },
         password: {
             type: DataTypes.STRING,
-            allowNull: false
+            allowNull: true
         },
         email: {
             type: DataTypes.STRING,
@@ -82,6 +82,9 @@ const user = (sequelize, DataTypes) => {
         }
     );
     User.prototype.validPassword = function (password) {
+        if (password == "") {
+            return false;
+        }
         return bcrypt.compareSync(password, this.password);
     };
     return User;

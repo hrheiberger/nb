@@ -17,6 +17,11 @@ export default new Router({
             component: () => import('./views/WelcomePage.vue')
         },
         {
+            path: '/canvas-login',
+            name: 'canvas-login-page',
+            component: () => import('./views/CanvasLoginPage.vue')
+        },
+        {
             path: '/login',
             name: 'login-page',
             component: () => import('./views/LoginPage.vue')

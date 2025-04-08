@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const User = require('../models').User;
@@ -72,7 +73,7 @@ router.post('/login', async (req, res) => {
   } else if (!user.validPassword(password)) {
     res.status(401).json({ msg: "Incorrect password" });
   } else {
-    const token = jwt.sign({ user: user }, process.env.JWT_SECRET);
+    const token = jwt.sign({ user: user, access_token: undefined}, process.env.JWT_SECRET);
     res.status(200).json({ token });
   }
 });
@@ -90,6 +91,77 @@ router.post('/register', (req, res) => {
     console.log("error:" + err);
     res.status(400).json({ msg: err.errors[0].message })
   })
+});
+
+router.post('/register-canvas', async (req, res) => {
+  const client_id = process.env.VUE_APP_CLIENT_ID;
+  const client_secret = process.env.VUE_APP_CLIENT_SECRET;
+  const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
+
+  // Verify OAuth Code
+  let access_token;
+  try {
+    const response = await axios.post(
+      'https://canvas.mit.edu/login/oauth2/token',
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id,
+        client_secret,
+        redirect_uri,
+        code: req.body.code
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+    access_token = response.data.access_token;
+  } catch (err) {
+    console.log("error:" + err);
+    res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+  }
+
+  // Get Canvas Profile
+  try {
+    /*
+    const response = await axios.get('https://canvas.mit.edu/api/v1/users/self/profile', {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    });
+    */
+    console.log("TODO: Make this a real request");
+  } catch (err) {
+    console.log("error:" + err);
+    res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+  }
+  const username = "hrheiberger";
+
+  // Create user
+  try {
+    await User.create({
+      username: username,
+      first_name: "henry",
+      last_name: "heiberger",
+      email: "hrheiberger@gmail.com",
+      password: ""
+    });
+  }
+  catch (err) {
+    console.log("error:" + err);
+    console.log(err.errors[0].message);
+    res.status(400).json({ msg: err.errors[0].message })
+  }
+ 
+  // Return NB user
+  const user = await User.findOne({ where: { username: { [Op.iLike]: username } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
+  if (!user) {
+    res.status(500).json({ msg: "Couldn't create user"});
+  }  else {
+    const token = jwt.sign({ user: user, access_token: access_token}, process.env.JWT_SECRET);
+    res.status(200).json({ token });
+  }
 });
 
 router.post('/forgotpassword', (req, res) => {
