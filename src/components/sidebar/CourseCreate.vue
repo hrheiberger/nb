@@ -35,7 +35,7 @@
             this.$emit("create-course")
         })
       },
-    }
+    },
   }
 </script>
 
@@ -43,7 +43,7 @@
   .create-course {
     display: flex;
     flex-direction: column;
-    padding: 0 20px 20px 0;
+    padding: 0 20px 0 0;
   }
   .create-course .group {
     display: flex;

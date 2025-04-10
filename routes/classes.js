@@ -1,4 +1,6 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
+const axios = require('axios');
 const User = require('../models').User;
 const Class = require('../models').Class;
 const Source = require('../models').Source;
@@ -15,6 +17,7 @@ const EmailUtil = require('../utils/emailUtil')
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
+router.use(cookieParser());
 
 /**
  * Create a new class.
@@ -46,6 +49,42 @@ router.post('/edit', (req, res) => {
   utils.editClass(id, req.body.course, "").then(() => {
     res.status(200).json(req.body.course)
   });
+});
+
+/**
+ * Get all canvas classes for which current user is an instructor.
+ * @name GET/api/classes/canvas
+ */
+router.get('/canvas', async (req, res) => {
+  try {
+    // Retrieve user's Canvas access token from cookie
+    canvasAccessToken = req.cookies.canvas_access_token;
+    if (!canvasAccessToken) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
+
+    // Get courses from Canvas
+    const response = await axios.get('https://canvas.mit.edu/api/v1/courses', {
+      headers: {
+        Authorization: `Bearer ${canvasAccessToken}`
+      },
+      params: {
+        enrollment_type: 'teacher', // Only pull courses where the user is an instructor
+        enrollment_state: 'active',	// Only pull courses for current term
+        per_page: 100, // TODO: Eventually handle pagination here, though unlikely to exceed 100 courses
+      }
+    });
+
+    // Gather course info
+    const courses = response.data.map(course => ({
+      id: course.id,
+      name: course.name,
+    }));
+    res.status(200).json(courses);
+  } catch (error) {
+    console.error('Error fetching Canvas courses:', error.response?.data || error.message);
+    res.status(500).json({ msg: 'Failed to pull Canvas courses' });
+  }
 });
 
 /**

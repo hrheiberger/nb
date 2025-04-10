@@ -17,6 +17,10 @@
             <br/>
             <hr/>
             <course-create @create-course="onCreateCourse"></course-create>
+            <div v-if="isCanvasUser">
+              <hr/>
+              <canvas-course-create @create-canvas-course="onCanvasCourseCreate"></canvas-course-create>
+            </div>
             <a href="https://forms.gle/6YERC3jSu1W1zUzS8" class="nb-bug-link" target="_blank" >Report Bug</a>
         </div>
         <div class="dashboard-wrapper">
@@ -62,6 +66,7 @@ import "bootstrap/dist/css/bootstrap.css";
 Vue.use(VModal);
 import axios from "axios";
 import NavBar from "../components/NavBar.vue";
+import CanvasCourseCreate from "../components/sidebar/CanvasCourseCreate.vue";
 import CourseCreate from "../components/sidebar/CourseCreate.vue";
 import CourseList from "../components/sidebar/CourseList.vue";
 import CourseDashboard from "../components/course/CourseDashboard.vue";
@@ -71,6 +76,7 @@ export default {
   name: "dashboard-page",
   components: {
     NavBar,
+    CanvasCourseCreate,
     CourseCreate,
     CourseList,
     CourseDashboard,
@@ -84,6 +90,7 @@ export default {
         ta: []
       },
       selectedCourse: null,
+      isCanvasUser: document.cookie.includes('is_canvas_user=true'),
     };
   },
   computed: {
@@ -141,6 +148,9 @@ export default {
       this.selectedCourse = course;
     },
     onCreateCourse: function () {
+      this.loadCourses();
+    },
+    onCanvasCourseCreate: function () {
       this.loadCourses();
     },
     redirect: function (page) {
