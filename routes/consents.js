@@ -25,9 +25,10 @@ router.post('/', async (req, res) => {
         }
 
         const updatedUser = await User.findOne({ where: { id: req.user.id }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
-        const token = jwt.sign({ user: updatedUser }, process.env.JWT_SECRET);
+        const token = jwt.sign({ user: updatedUser}, process.env.JWT_SECRET);
         res.status(200).json({ token });
     } catch (err) {
+        console.log(err);
         res.sendStatus(400)
     }
 })

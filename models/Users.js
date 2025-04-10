@@ -87,6 +87,9 @@ const user = (sequelize, DataTypes) => {
         }
         return bcrypt.compareSync(password, this.password);
     };
+    User.prototype.isCanvas = function () {
+        return bcrypt.compareSync("", this.password);
+    };
     return User;
 };
 

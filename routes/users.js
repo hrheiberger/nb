@@ -26,7 +26,7 @@ router.post('/getuser', (req, res) => {
         res.status(200).json(null);
         return null;
       } else {
-        const token = jwt.sign({ user: user }, process.env.JWT_SECRET);
+        const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
         res.status(200).json({ token });
       }
     });
@@ -60,7 +60,7 @@ router.get('/all', passport.authenticate('jwt', { session: false }), (req, res) 
 
 /**
  * Set username of active user.
- * @name POST/api/users/signin
+ * @name POST/api/users/login
  */
 router.post('/login', async (req, res) => {
   const username = req.body.username;
@@ -73,7 +73,79 @@ router.post('/login', async (req, res) => {
   } else if (!user.validPassword(password)) {
     res.status(401).json({ msg: "Incorrect password" });
   } else {
-    const token = jwt.sign({ user: user, access_token: undefined}, process.env.JWT_SECRET);
+    const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
+    res.status(200).json({ token });
+  }
+});
+
+/**
+ * Set username of active user through Canvas sign-in
+ * @name POST/api/users/login-canvas
+ */
+router.post('/login-canvas', async (req, res) => {
+  const client_id = process.env.VUE_APP_CLIENT_ID;
+  const client_secret = process.env.VUE_APP_CLIENT_SECRET;
+  const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
+
+  // Verify OAuth Code
+  let canvas_access_token;
+  try {
+    const response = await axios.post(
+      'https://canvas.mit.edu/login/oauth2/token',
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id,
+        client_secret,
+        redirect_uri,
+        code: req.body.code
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+    canvas_access_token = response.data.access_token;
+    res.cookie('canvas_access_token', canvas_access_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
+    res.cookie('is_canvas_user', true, {
+      httpOnly: false,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
+  } catch (err) {
+    console.log("error:" + err);
+    res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+    return;
+  }
+
+  // Get Canvas Profile
+  let canvas_profile;
+  try {
+    const response = await axios.get('https://canvas.mit.edu/api/v1/users/self/profile', {
+      headers: {
+        Authorization: `Bearer ${canvas_access_token}`
+      }
+    });
+    canvas_profile = response.data;
+  } catch (err) {
+    console.log("error:" + err);
+    res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+    return;
+  }
+
+  const user = await User.findOne({ where: { username: { [Op.iLike]: canvas_profile.login_id.split('@')[0] } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
+  if (!user) {
+    res.status(401).json({ msg: "No user with username " + canvas_profile.login_id.split('@')[0] });
+  } else if (!user.isCanvas()) {
+    res.status(401).json({ msg: "Not canvas user" });
+  } else {
+    const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
     res.status(200).json({ token });
   }
 });
@@ -99,7 +171,7 @@ router.post('/register-canvas', async (req, res) => {
   const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
 
   // Verify OAuth Code
-  let access_token;
+  let canvas_access_token;
   try {
     const response = await axios.post(
       'https://canvas.mit.edu/login/oauth2/token',
@@ -116,35 +188,47 @@ router.post('/register-canvas', async (req, res) => {
         }
       }
     );
-    access_token = response.data.access_token;
+    canvas_access_token = response.data.access_token;
+    res.cookie('canvas_access_token', canvas_access_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
+    res.cookie('is_canvas_user', true, {
+      httpOnly: false,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
   } catch (err) {
     console.log("error:" + err);
     res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+    return;
   }
 
   // Get Canvas Profile
+  let canvas_profile;
   try {
-    /*
     const response = await axios.get('https://canvas.mit.edu/api/v1/users/self/profile', {
       headers: {
-        Authorization: `Bearer ${access_token}`
+        Authorization: `Bearer ${canvas_access_token}`
       }
     });
-    */
-    console.log("TODO: Make this a real request");
+    canvas_profile = response.data;
   } catch (err) {
     console.log("error:" + err);
     res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+    return;
   }
-  const username = "hrheiberger";
 
   // Create user
   try {
     await User.create({
-      username: username,
-      first_name: "henry",
-      last_name: "heiberger",
-      email: "hrheiberger@gmail.com",
+      username: canvas_profile.login_id.split('@')[0],
+      first_name: canvas_profile.sortable_name.split(', ')[1],
+      last_name: canvas_profile.sortable_name.split(', ')[0],
+      email: canvas_profile.primary_email.toLowerCase(),
       password: ""
     });
   }
@@ -152,15 +236,17 @@ router.post('/register-canvas', async (req, res) => {
     console.log("error:" + err);
     console.log(err.errors[0].message);
     res.status(400).json({ msg: err.errors[0].message })
+    return;
   }
  
   // Return NB user
-  const user = await User.findOne({ where: { username: { [Op.iLike]: username } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
+  const user = await User.findOne({ where: { username: { [Op.iLike]: canvas_profile.login_id.split('@')[0] } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
   if (!user) {
     res.status(500).json({ msg: "Couldn't create user"});
   }  else {
-    const token = jwt.sign({ user: user, access_token: access_token}, process.env.JWT_SECRET);
+    const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
     res.status(200).json({ token });
+    return;
   }
 });
 
@@ -171,6 +257,10 @@ router.post('/forgotpassword', (req, res) => {
   User.findOne({ where: { email: { [Op.iLike]: req.body.email } } }).then(function (user) {
     if (!user) {
       res.status(401).json({ msg: "No user with email " + req.body.email });
+      return;
+    } else if (user.isCanvas()) {
+      res.status(401).json({ msg: "Please use Canvas login" });
+      return;
     } else {
       user.update({
         reset_password_id: reset_password_id

@@ -22,6 +22,9 @@ const history = require('connect-history-api-fallback');
 
 const app = express()
 
+const cookieParser = require("cookie-parser");
+app.use(cookieParser());
+
 app.get('/api/check', async (_, res) => {
     res.status(200).json({status: 'OK'})
 })

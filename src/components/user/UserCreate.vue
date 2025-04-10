@@ -133,7 +133,6 @@
 <script>
     import axios from "axios"
     import { eventBus } from "../../main"
-    import VueJwtDecode from "vue-jwt-decode";
 
     export default {
         name: "user-create",
@@ -211,7 +210,7 @@
                     const client_id = process.env.VUE_APP_CLIENT_ID;
                     const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
                     const state = encodeURIComponent(JSON.stringify({code: 123, type: "SIGN_UP"}));
-                    const scopes = encodeURIComponent("url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
+                    const scopes = encodeURIComponent("url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
                     const main_tab = document.activeElement;
                     const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
                     
@@ -224,11 +223,6 @@
                             // Verify Login Successful
                             const token = localStorage.getItem("nb.user");
                             if (token == undefined) {
-                                this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
-                                return;
-                            }
-                            const decoded = VueJwtDecode.decode(token);
-                            if (decoded.access_token == undefined || decoded.user == undefined) {
                                 this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
                                 return;
                             }

@@ -100,6 +100,39 @@ export default {
         }, 250);
         return;
       }
+    } else if (state.type == "LOGIN") {
+      // Handle OAuth failure
+      if (this.$route.query.error != undefined) {
+        setTimeout(() => {
+          window.close();
+        }, 250);
+        return;
+      }
+      else if (this.$route.query.code == undefined) {
+        setTimeout(() => {
+          window.close();
+        }, 250);
+        return;    
+      }
+
+      // Verify OAuth code and Login
+      try {
+        const code = this.$route.query.code
+        const response = await axios.post("api/users/login-canvas", {code});
+        token = response.data.token;
+        if (token == undefined) {
+          setTimeout(() => {
+            window.close();
+          }, 250);
+          return;
+        }
+      } catch (error) {
+        console.log(error);
+        setTimeout(() => {
+          window.close();
+        }, 250);
+        return;
+      }
     }
 
     // Login to User

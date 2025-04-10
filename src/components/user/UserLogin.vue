@@ -17,6 +17,9 @@
     <button class="submit" :disabled="!submitEnabled" @click="login">
       Sign in
     </button>
+    <button class="submit" @click="loginCanvas">
+      Sign in with Canvas
+    </button>
     <br><br>
     <h3 class="title">Reset Your Password</h3>
     <div class="group">
@@ -77,6 +80,39 @@
                     this.message = "Invalid username and password. Try again!"
                 }
 
+                console.error(`Signin failed: ${err.response.data.error}`)
+            }
+        },
+        loginCanvas: async function() {
+            try {
+                // Open Canvas OAuth Login Window
+                const client_id = process.env.VUE_APP_CLIENT_ID;
+                const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
+                const state = encodeURIComponent(JSON.stringify({code: 123, type: "LOGIN"}));
+                const scopes = encodeURIComponent("url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
+                const main_tab = document.activeElement;
+                const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
+                
+                // Wait for OAuth Login to finish
+                const interval = setInterval(async () => {
+                    if (login_tab.closed) {
+                        clearInterval(interval);
+                        main_tab.focus();
+
+                        // Verify Login Successful
+                        const token = localStorage.getItem("nb.user");
+                        if (token == undefined) {
+                            this.message = "Invalid Canvas user. Try again!";
+                            return;
+                        }
+
+                        localStorage.setItem("nb.user", token);
+                        eventBus.$emit('signin-success')
+                        this.resetForm()
+                    }
+                })
+            } catch (error) {
+                this.message = "Invalid Canvas user. Try again!";
                 console.error(`Signin failed: ${err.response.data.error}`)
             }
         },
