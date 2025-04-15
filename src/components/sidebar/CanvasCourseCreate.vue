@@ -29,17 +29,36 @@
         selectedCanvasCourse: null, // The selected Canvas course
       }
     },
+    props: {
+      instructor: {
+        type: Array,
+        default: () => [],
+      },
+    },
     methods: {
       pullCanvasCourses: async function() {
+        const importedCourses = new Set();
+        for (const course of this.instructor) {
+          importedCourses.add(course.canvas_id);
+        }
+
         try {
+          // Fetch active instructed Canvas courses
           const token = localStorage.getItem("nb.user");
           const headers = { headers: { Authorization: 'Bearer ' + token }};
           const response = await axios.get("/api/classes/canvas", headers);
-          this.canvasCourses = response.data;
+
+          // List unimported instructed Canvas courses
+          const canvasCourses = [];
+          for (const canvasCourse of response.data) {
+            if (!importedCourses.has(canvasCourse.id)) {
+              canvasCourses.push(canvasCourse);
+            }
+          }
+          this.canvasCourses = canvasCourses;
           this.$emit("canvas-course-create");
         } catch (err) {
           console.log(err);
-          console.log("Womp womp...");
         }
       },
 
@@ -47,7 +66,7 @@
         try {
           const token = localStorage.getItem("nb.user");
           const headers = { headers: { Authorization: 'Bearer ' + token }};
-          axios.post("/api/classes/create", this.selectedCanvasCourse, headers).then(res => {
+          axios.post("/api/classes/import", this.selectedCanvasCourse, headers).then(res => {
             this.selectedCanvasCourse = null;
             localStorage.setItem("nb.current.course",JSON.stringify(res.data));
             this.$emit("create-canvas-course");
@@ -57,11 +76,14 @@
         }
       },
     },
-    async created () {
-      this.$isLoading(true);
-      await this.pullCanvasCourses();
-      this.$isLoading(false)
-    },
+    watch: {
+      instructor: {
+        handler(newInstructor) {
+          this.pullCanvasCourses();
+        },
+        immediate: true
+      }
+    }
   }
 </script>
 

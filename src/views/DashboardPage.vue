@@ -19,7 +19,10 @@
             <course-create @create-course="onCreateCourse"></course-create>
             <div v-if="isCanvasUser">
               <hr/>
-              <canvas-course-create @create-canvas-course="onCanvasCourseCreate"></canvas-course-create>
+              <canvas-course-create 
+                :instructor="courses.instructor"
+                @create-canvas-course="onCanvasCourseCreate">
+              </canvas-course-create>
             </div>
             <a href="https://forms.gle/6YERC3jSu1W1zUzS8" class="nb-bug-link" target="_blank" >Report Bug</a>
         </div>

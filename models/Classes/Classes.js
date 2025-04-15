@@ -5,6 +5,11 @@ const nb_class = (sequelize, DataTypes) => {
       defaultValue: DataTypes.UUIDV1,
       primaryKey: true
     },
+    canvas_id: {
+      type: DataTypes.INTEGER,
+      unique: true, // TODO: do we want these to be unique?
+      allowNull: true,
+    },
     class_name:{
       type: DataTypes.STRING,
       unique: true,

@@ -142,7 +142,7 @@ router.post('/login-canvas', async (req, res) => {
   const user = await User.findOne({ where: { username: { [Op.iLike]: canvas_profile.login_id.split('@')[0] } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
   if (!user) {
     res.status(401).json({ msg: "No user with username " + canvas_profile.login_id.split('@')[0] });
-  } else if (!user.isCanvas()) {
+  } else if (false && !user.isCanvas()) { // TODO: Enabling this doesn't allow user's with passwords to login with Canvas.  Do we want?
     res.status(401).json({ msg: "Not canvas user" });
   } else {
     const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
@@ -258,7 +258,7 @@ router.post('/forgotpassword', (req, res) => {
     if (!user) {
       res.status(401).json({ msg: "No user with email " + req.body.email });
       return;
-    } else if (user.isCanvas()) {
+    } else if (false && user.isCanvas()) { // TODO: Enabling this doesn't allow Canvas user's to set passwords to their acount.  Do we want?
       res.status(401).json({ msg: "Please use Canvas login" });
       return;
     } else {

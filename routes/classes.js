@@ -36,6 +36,87 @@ router.post('/create', (req, res) => {
 });
 
 /**
+ * Import a new Canvas class.
+ * @name POST/api/classes/import
+ * @param name: name of class
+ * @param id: canvas course_id
+ */
+router.post('/import', async (req, res) => {
+  // Verify params
+  const name = req.body.name;
+  const course_id = req.body.id;
+  if (!name) {
+    return res.status(400).json({ msg: "bad name" });
+  }
+  else if (!course_id) {
+    return res.status(400).json({ msg: "bad course id" });
+  }
+
+  // Retrieve user's Canvas access token from cookie
+  canvasAccessToken = req.cookies.canvas_access_token;
+  if (!canvasAccessToken) {
+    return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+  }
+
+  // Create Canvas class
+  let nb_class;
+  try {
+    const nb_class_no_section = await utils.createClass(name, req.user.id, course_id);
+    nb_class = await Class.findByPk(nb_class_no_section.id, { include: [{ association: 'GlobalSection' }] });
+  } catch {
+    return res.status(500).json({msg: "class creation failed"})
+  }
+
+  // Fetch students in class
+  let students;
+  try {
+    students = await getCanvasCourseStudents(canvasAccessToken, course_id);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({msg: "student fetching failed"})
+  }
+
+  // Add each student to the class
+  for (const student of students) {
+    const profile = student.profile;
+    const role = student.enrollment_type;
+    const section = student.section;
+
+    // Get student NB profile
+    let user = await User.findOne({ where: { email: { [Op.iLike]: profile.primary_email } } });
+
+    // If user doesn't already exist -> register them first
+    if (user === null) { 
+      try {
+        user = await User.create({
+          username: profile.login_id.split('@')[0],
+          first_name: profile.sortable_name.split(', ')[1],
+          last_name: profile.sortable_name.split(', ')[0],
+          email: profile.primary_email.toLowerCase(),
+          password: ""
+        });
+      } catch (err) {} // Canvas user already exists
+    }
+
+    if (role === "TeacherEnrollment") {
+      await nb_class.addInstructor(user);
+    }
+    else if (role === "TaEnrollment") {
+      await nb_class.addClassTAs(user);
+    }
+    else if (role === "StudentEnrollment") {
+      if (section != "") {
+        utils.addStudentToSection(nb_class, user, section);
+      } else {
+        utils.addStudent(nb_class.id, user.id);
+      }
+    }
+  }
+
+  res.status(200).json(nb_class);
+});
+
+/**
  * Edit class.
  * @name POST/api/classes/edit
  * @param id: id of class
@@ -86,6 +167,38 @@ router.get('/canvas', async (req, res) => {
     res.status(500).json({ msg: 'Failed to pull Canvas courses' });
   }
 });
+
+async function getCanvasCourseStudents(canvasAccessToken, course_id) {
+  // Fetch list of Canvas students
+  const response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${course_id}/enrollments`, {
+    headers: {
+      Authorization: `Bearer ${canvasAccessToken}`
+    },
+    params: {
+      state: "active",
+      per_page: 100, // TODO: Pagination should be handled here
+    },
+  });
+
+  // Fetch student profiles
+  const students = [];
+  for (const enrollment of response.data) {
+    const profile = (await axios.get(`https://canvas.mit.edu/api/v1/users/${enrollment.user.id}/profile`, {
+      headers: {
+        Authorization: `Bearer ${canvasAccessToken}`
+      },
+      params: {}
+    })).data;
+    students.push({
+      canvas_id: profile.id,
+      enrollment_type: enrollment.type,
+      section: `${enrollment.course_section_id}`,
+      profile: profile,
+    });
+  }
+
+  return students;
+}
 
 /**
  * Get all classes for which current user is an instructor.

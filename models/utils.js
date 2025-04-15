@@ -43,9 +43,10 @@ module.exports = function (models) {
         //if(newData.description)
       })
     },
-    createClass: function (name, userId) {
+    createClass: function (name, userId, canvasId=null) {
       return Class.create({
-        class_name: name
+        class_name: name,
+        canvas_id: canvasId,
       })
         //create the global section
         .then((nb_class) =>

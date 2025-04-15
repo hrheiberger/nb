@@ -210,7 +210,7 @@
                     const client_id = process.env.VUE_APP_CLIENT_ID;
                     const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
                     const state = encodeURIComponent(JSON.stringify({code: 123, type: "SIGN_UP"}));
-                    const scopes = encodeURIComponent("url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
+                    const scopes = encodeURIComponent("url:GET|/api/v1/courses/:course_id/enrollments url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/users url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
                     const main_tab = document.activeElement;
                     const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
                     
@@ -243,9 +243,9 @@
                             this.resetForm();
                         }
                     }, 500); // Check every 500ms
-                } catch (error) {
-                    console.log(error)
-                    let msg = error.response.data.msg
+                } catch (err) {
+                    console.log(err)
+                    let msg = err.response.data.msg
                     console.error(`Signup failed: ${msg}`)
                     if (msg.includes("unique")) {
                         if (msg.includes("username")) {
