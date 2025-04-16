@@ -169,8 +169,22 @@ router.get('/canvas', async (req, res) => {
 });
 
 async function getCanvasCourseStudents(canvasAccessToken, course_id) {
-  // Fetch list of Canvas students
-  const response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${course_id}/enrollments`, {
+  // Fetch Canvas course sections
+  const sections = {};
+  const sections_response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${course_id}/sections`, {
+    headers: {
+      Authorization: `Bearer ${canvasAccessToken}`
+    },
+    params: {
+      per_page: 100, // TODO: Pagination could be handled here, though likely not needed
+    },
+  });
+  for (const section of sections_response.data) {
+    sections[section.id] = section.name;
+  }
+  
+  // Fetch Canvas course students
+  const enrollments_response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${course_id}/enrollments`, {
     headers: {
       Authorization: `Bearer ${canvasAccessToken}`
     },
@@ -182,7 +196,7 @@ async function getCanvasCourseStudents(canvasAccessToken, course_id) {
 
   // Fetch student profiles
   const students = [];
-  for (const enrollment of response.data) {
+  for (const enrollment of enrollments_response.data) {
     const profile = (await axios.get(`https://canvas.mit.edu/api/v1/users/${enrollment.user.id}/profile`, {
       headers: {
         Authorization: `Bearer ${canvasAccessToken}`
@@ -192,7 +206,7 @@ async function getCanvasCourseStudents(canvasAccessToken, course_id) {
     students.push({
       canvas_id: profile.id,
       enrollment_type: enrollment.type,
-      section: `${enrollment.course_section_id}`,
+      section: `${sections[enrollment.course_section_id]}`,
       profile: profile,
     });
   }
