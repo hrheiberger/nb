@@ -63,16 +63,18 @@
       },
 
       importCanvasCourse: async function() {
+        this.$isLoading(true);
         try {
           const token = localStorage.getItem("nb.user");
           const headers = { headers: { Authorization: 'Bearer ' + token }};
-          axios.post("/api/classes/import", this.selectedCanvasCourse, headers).then(res => {
-            this.selectedCanvasCourse = null;
-            localStorage.setItem("nb.current.course",JSON.stringify(res.data));
-            this.$emit("create-canvas-course");
-        }) 
+          const nb_class_res = await axios.post("/api/classes/import", this.selectedCanvasCourse, headers);
+          this.selectedCanvasCourse = null;
+          localStorage.setItem("nb.current.course",JSON.stringify(nb_class_res.data));
+          this.$emit("create-canvas-course");
+
         } catch (err) {
           console.log(err); //TODO: Deal with this error
+          this.$isLoading(false);
         }
       },
     },

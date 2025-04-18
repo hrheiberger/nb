@@ -15,6 +15,7 @@ var upload = multer({ dest: 'uploads/' });
 const { Op } = require("sequelize");
 const EmailUtil = require('../utils/emailUtil')
 const { v4: uuidv4 } = require('uuid');
+const { refreshCanvasAccessToken } = require("./utils");
 
 const router = express.Router();
 router.use(cookieParser());
@@ -55,7 +56,17 @@ router.post('/import', async (req, res) => {
   // Retrieve user's Canvas access token from cookie
   canvasAccessToken = req.cookies.canvas_access_token;
   if (!canvasAccessToken) {
-    return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(401).json({ msg: "Cannot find user"});
+    }
+    if (!user.canvas_refresh_token) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
+    canvasAccessToken = await refreshCanvasAccessToken(user, res);
+    if (!canvasAccessToken) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
   }
 
   // Create Canvas class
@@ -63,7 +74,7 @@ router.post('/import', async (req, res) => {
   try {
     const nb_class_no_section = await utils.createClass(name, req.user.id, course_id);
     nb_class = await Class.findByPk(nb_class_no_section.id, { include: [{ association: 'GlobalSection' }] });
-  } catch {
+  } catch (err) {
     return res.status(500).json({msg: "class creation failed"})
   }
 
@@ -141,7 +152,17 @@ router.get('/canvas', async (req, res) => {
     // Retrieve user's Canvas access token from cookie
     canvasAccessToken = req.cookies.canvas_access_token;
     if (!canvasAccessToken) {
-      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+      const user = await User.findByPk(req.user.id);
+      if (!user) {
+        return res.status(401).json({ msg: "Cannot find user"});
+      }
+      if (!user.canvas_refresh_token) {
+        return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+      }
+      canvasAccessToken = await refreshCanvasAccessToken(user, res);
+      if (!canvasAccessToken) {
+        return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+      }
     }
 
     // Get courses from Canvas

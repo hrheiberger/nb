@@ -6,7 +6,7 @@ module.exports = {
     await queryInterface.addColumn('classes', 'canvas_id', {
       type: Sequelize.INTEGER,
       allowNull: true,
-      unique: true
+      unique: false,
     });
   },
 

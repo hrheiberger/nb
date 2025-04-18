@@ -7,7 +7,7 @@ const nb_class = (sequelize, DataTypes) => {
     },
     canvas_id: {
       type: DataTypes.INTEGER,
-      unique: true, // TODO: do we want these to be unique?
+      unique: false,
       allowNull: true,
     },
     class_name:{

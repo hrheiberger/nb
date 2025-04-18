@@ -93,7 +93,7 @@ export default {
         ta: []
       },
       selectedCourse: null,
-      isCanvasUser: document.cookie.includes('is_canvas_user=true'),
+      isCanvasUser: false,
     };
   },
   computed: {
@@ -166,11 +166,23 @@ export default {
       this.$modal.hide("bookmarklet-modal");
     },
   },
-  created: function () {
+  created: async function () {
+    this.isCanvasUser = document.cookie.includes('is_canvas_user=true');
     try {
       const token = localStorage.getItem("nb.user");
       const decoded = VueJwtDecode.decode(token);
       if (decoded.user.username && decoded.user.username !== "") {
+        // Refresh Canvas Access token if expired
+        if (decoded.user.canvas_refresh_token && !this.isCanvasUser) {
+          const headers = { headers: { Authorization: "Bearer " + token } };
+          try {
+            await axios.get(`/api/users/refresh-canvas`, headers);
+            this.isCanvasUser = true;
+          } catch {
+            this.isCanvasUser = false;
+          }
+        }
+
         this.user = decoded.user;
         this.loadCourses();
       } else {

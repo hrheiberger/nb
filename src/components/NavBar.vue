@@ -64,7 +64,12 @@ export default {
         redirect: function (page) {
             this.$router.push({ name: page });
         },
-        logout: function () {
+        logout: async function () {
+            try {
+              const token = localStorage.getItem("nb.user");
+              const headers = { headers: { Authorization: 'Bearer ' + token }};
+              await axios.post(`/api/users/logout`, {}, headers);
+            } catch {}
             localStorage.removeItem("nb.user");
             localStorage.removeItem("nb.current.course");
             eventBus.$emit("signout-success", true);

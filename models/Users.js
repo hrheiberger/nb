@@ -45,6 +45,11 @@ const user = (sequelize, DataTypes) => {
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: false
+        },
+        canvas_refresh_token: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+            unique: false,
         }
     },
         {

@@ -8,6 +8,7 @@ const transporter = require('../email-config');
 const { v4: uuidv4 } = require('uuid');
 const donenv = require('dotenv');
 const { Op } = require("sequelize");
+const { refreshCanvasAccessToken } = require("./utils");
 
 donenv.config();
 
@@ -84,11 +85,12 @@ router.post('/login', async (req, res) => {
  */
 router.post('/login-canvas', async (req, res) => {
   const client_id = process.env.VUE_APP_CLIENT_ID;
-  const client_secret = process.env.VUE_APP_CLIENT_SECRET;
+  const client_secret = process.env.CLIENT_SECRET;
   const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
 
   // Verify OAuth Code
   let canvas_access_token;
+  let canvas_refresh_token;
   try {
     const response = await axios.post(
       'https://canvas.mit.edu/login/oauth2/token',
@@ -97,6 +99,7 @@ router.post('/login-canvas', async (req, res) => {
         client_id,
         client_secret,
         redirect_uri,
+        expires_in: 3600,
         code: req.body.code
       }),
       {
@@ -106,6 +109,7 @@ router.post('/login-canvas', async (req, res) => {
       }
     );
     canvas_access_token = response.data.access_token;
+    canvas_refresh_token = response.data.refresh_token;
     res.cookie('canvas_access_token', canvas_access_token, {
       httpOnly: true,
       secure: true,
@@ -145,6 +149,7 @@ router.post('/login-canvas', async (req, res) => {
   } else if (false && !user.isCanvas()) { // TODO: Enabling this doesn't allow user's with passwords to login with Canvas.  Do we want?
     res.status(401).json({ msg: "Not canvas user" });
   } else {
+    await user.update({ canvas_refresh_token: canvas_refresh_token });
     const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
     res.status(200).json({ token });
   }
@@ -167,11 +172,12 @@ router.post('/register', (req, res) => {
 
 router.post('/register-canvas', async (req, res) => {
   const client_id = process.env.VUE_APP_CLIENT_ID;
-  const client_secret = process.env.VUE_APP_CLIENT_SECRET;
+  const client_secret = process.env.CLIENT_SECRET;
   const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
 
   // Verify OAuth Code
   let canvas_access_token;
+  let canvas_refresh_token;
   try {
     const response = await axios.post(
       'https://canvas.mit.edu/login/oauth2/token',
@@ -180,6 +186,7 @@ router.post('/register-canvas', async (req, res) => {
         client_id,
         client_secret,
         redirect_uri,
+        expires_in: 3600,
         code: req.body.code
       }),
       {
@@ -189,6 +196,7 @@ router.post('/register-canvas', async (req, res) => {
       }
     );
     canvas_access_token = response.data.access_token;
+    canvas_refresh_token = response.data.refresh_token;    
     res.cookie('canvas_access_token', canvas_access_token, {
       httpOnly: true,
       secure: true,
@@ -229,7 +237,8 @@ router.post('/register-canvas', async (req, res) => {
       first_name: canvas_profile.sortable_name.split(', ')[1],
       last_name: canvas_profile.sortable_name.split(', ')[0],
       email: canvas_profile.primary_email.toLowerCase(),
-      password: ""
+      password: "",
+      canvas_refresh_token: canvas_refresh_token,
     });
   }
   catch (err) {
@@ -247,6 +256,19 @@ router.post('/register-canvas', async (req, res) => {
     const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
     res.status(200).json({ token });
     return;
+  }
+});
+
+router.get('/refresh-canvas', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(401).json({ msg: "Cannot find user"});
+    }
+    await refreshCanvasAccessToken(user, res);
+    res.status(200).json({ msg: "Canvas access token refreshed"});
+  } catch (err) {
+    res.status(500).json({ msg: "Error refreshing Canvas acess token"});
   }
 });
 
@@ -338,9 +360,14 @@ router.put('/editAuth', passport.authenticate('jwt', { session: false }), (req, 
 });
 
 router.post('/logout', passport.authenticate('jwt', { session: false }), (req, res) => {
-  console.log(req.user);
-  req.logout();
-  res.status(200).json({ msg: "signed out" }).end();
+  try {
+    res.clearCookie('canvas_access_token');
+    res.clearCookie('is_canvas_user');
+    res.status(200).json({ msg: "signed out" }).end();
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ msg: "Error logging out"});
+  }
 });
 
 module.exports = router;
