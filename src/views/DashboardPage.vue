@@ -73,7 +73,7 @@ import CanvasCourseCreate from "../components/sidebar/CanvasCourseCreate.vue";
 import CourseCreate from "../components/sidebar/CourseCreate.vue";
 import CourseList from "../components/sidebar/CourseList.vue";
 import CourseDashboard from "../components/course/CourseDashboard.vue";
-import VueJwtDecode from "vue-jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 
 export default {
   name: "dashboard-page",
@@ -170,7 +170,7 @@ export default {
     this.isCanvasUser = document.cookie.includes('is_canvas_user=true');
     try {
       const token = localStorage.getItem("nb.user");
-      const decoded = VueJwtDecode.decode(token);
+      const decoded = jwtDecode(token);
       if (decoded.user.username && decoded.user.username !== "") {
         // Refresh Canvas Access token if expired
         if (decoded.user.canvas_refresh_token && !this.isCanvasUser) {

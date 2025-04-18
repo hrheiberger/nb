@@ -13,7 +13,7 @@
 import axios from "axios";
 import NavBar from "../components/NavBar.vue";
 import ResetPassword from "../components/user/ResetPassword.vue";
-import VueJwtDecode from "vue-jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 
 export default {
   name: "reset-password-page",
@@ -56,7 +56,7 @@ export default {
     try {
       const token = localStorage.getItem("nb.user");
       if (token) {
-        const decoded = VueJwtDecode.decode(token);
+        const decoded = jwtDecode(token);
         if (decoded.user.username && decoded.user.username !== "") {
           this.user = decoded.user;
         }
@@ -66,7 +66,7 @@ export default {
         }); // pass in id to get that user is none is currently logged in
         const token = res.data.token;
         localStorage.setItem("nb.user", token);
-        const decoded = VueJwtDecode.decode(token);
+        const decoded = jwtDecode(token);
         this.user = decoded.user;
       } else {
         this.user = null;

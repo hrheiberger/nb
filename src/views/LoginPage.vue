@@ -32,7 +32,7 @@ import { eventBus } from "../main";
 import NavBar from "../components/NavBar.vue";
 import UserCreate from "../components/user/UserCreate.vue";
 import UserLogin from "../components/user/UserLogin.vue";
-import VueJwtDecode from "vue-jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 
 export default {
   name: "login-page",
@@ -46,7 +46,7 @@ export default {
     try {
       const token = localStorage.getItem("nb.user");
       if (token) {
-        const decoded = VueJwtDecode.decode(token);
+        const decoded = jwtDecode(token);
         if (decoded.user.username && decoded.user.username !== "") {
           this.user = decoded.user;
           this.$router.push("dashboard");
@@ -59,7 +59,7 @@ export default {
     eventBus.$on("signin-success", () => {
       try {
         const token = localStorage.getItem("nb.user");
-        const decoded = VueJwtDecode.decode(token);
+        const decoded = jwtDecode(token);
         this.user = decoded.user;
         this.$router.push("dashboard").catch((err) => {});
       } catch (error) {

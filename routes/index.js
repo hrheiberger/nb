@@ -40,7 +40,6 @@ router.get('/api/nb/config', async (req, res) => {
 */
 router.post('/api/unsubscribe', async (req, res) => {
     const token = Buffer.from(req.body.token, 'base64').toString('ascii')?.split(':')
-    console.log(token);
     if (token.length === 2) {
         try {
             const item = await UserEmailPreference.findOne({where: {user_id: token[0], email_type_id: token[1]}})

@@ -46,8 +46,13 @@ const user = (sequelize, DataTypes) => {
             allowNull: false,
             defaultValue: false
         },
+        canvas_user_id: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            unique: true,
+        },
         canvas_refresh_token: {
-            type: DataTypes.TEXT,
+            type: DataTypes.STRING,
             allowNull: true,
             unique: false,
         }

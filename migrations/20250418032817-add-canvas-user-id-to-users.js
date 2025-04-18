@@ -5,16 +5,16 @@ module.exports = {
   async up (queryInterface, Sequelize) {
     await queryInterface.addColumn(
       'users', 
-      'canvas_refresh_token', 
+      'canvas_user_id', 
       {
-        type: Sequelize.STRING, 
+        type: Sequelize.STRING,
         allowNull: true,
-        unique: false,
+        unique: true,
       }
     );
   },
 
   async down (queryInterface, Sequelize) {
-    await queryInterface.removeColumn('users', 'canvas_refresh_token');
+    await queryInterface.removeColumn('users', 'canvas_user_id');
   }
 };

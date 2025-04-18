@@ -12,7 +12,7 @@
 <script>
 import NavBar from "../components/NavBar.vue";
 import UserProfile from "../components/user/UserProfile.vue";
-import VueJwtDecode from "vue-jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 import Vue           from 'vue'
 import Notifications from 'vue-notification'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -62,7 +62,7 @@ export default {
     try {
       const token = localStorage.getItem("nb.user");
       if (token) {
-        const decoded = VueJwtDecode.decode(token);
+        const decoded = jwtDecode(token);
         if (decoded.user.username && decoded.user.username !== "") {
           this.user = decoded.user;
         }

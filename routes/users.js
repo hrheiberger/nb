@@ -27,7 +27,7 @@ router.post('/getuser', (req, res) => {
         res.status(200).json(null);
         return null;
       } else {
-        const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
+        const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
         res.status(200).json({ token });
       }
     });
@@ -74,7 +74,7 @@ router.post('/login', async (req, res) => {
   } else if (!user.validPassword(password)) {
     res.status(401).json({ msg: "Incorrect password" });
   } else {
-    const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
+    const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
     res.status(200).json({ token });
   }
 });
@@ -143,14 +143,14 @@ router.post('/login-canvas', async (req, res) => {
     return;
   }
 
-  const user = await User.findOne({ where: { username: { [Op.iLike]: canvas_profile.login_id.split('@')[0] } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
+  const user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${canvas_profile.id}` } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
   if (!user) {
     res.status(401).json({ msg: "No user with username " + canvas_profile.login_id.split('@')[0] });
   } else if (false && !user.isCanvas()) { // TODO: Enabling this doesn't allow user's with passwords to login with Canvas.  Do we want?
     res.status(401).json({ msg: "Not canvas user" });
   } else {
     await user.update({ canvas_refresh_token: canvas_refresh_token });
-    const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
+    const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
     res.status(200).json({ token });
   }
 });
@@ -239,6 +239,7 @@ router.post('/register-canvas', async (req, res) => {
       email: canvas_profile.primary_email.toLowerCase(),
       password: "",
       canvas_refresh_token: canvas_refresh_token,
+      canvas_user_id: canvas_profile.id,
     });
   }
   catch (err) {
@@ -253,7 +254,7 @@ router.post('/register-canvas', async (req, res) => {
   if (!user) {
     res.status(500).json({ msg: "Couldn't create user"});
   }  else {
-    const token = jwt.sign({ user: user}, process.env.JWT_SECRET);
+    const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
     res.status(200).json({ token });
     return;
   }
@@ -326,7 +327,7 @@ router.put('/editPersonal', passport.authenticate('jwt', { session: false }), (r
         email: req.body.email.toLowerCase(),
         username: req.body.username,
       }).then((updatedUser) => {
-        const token = jwt.sign({ user: updatedUser }, process.env.JWT_SECRET);
+        const token = jwt.sign({ user: updatedUser.get({ plain: true}) }, process.env.JWT_SECRET);
         res.status(200).json({ token });
       }).catch((err) => {
         console.log("error: " + err);

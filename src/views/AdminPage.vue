@@ -178,7 +178,7 @@
 
 <script>
 import axios from "axios";
-import VueJwtDecode from "vue-jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 import NavBar from "../components/NavBar.vue";
 
 export default {
@@ -207,7 +207,7 @@ export default {
   },
   created: async function () {
     const token = localStorage.getItem("nb.user");
-    const decoded = VueJwtDecode.decode(token);
+    const decoded = jwtDecode(token);
     if (decoded.user.username && decoded.user.username !== "") {
       this.user = decoded.user;
       const headers = { headers: { Authorization: "Bearer " + token } };

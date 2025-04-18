@@ -15,7 +15,7 @@
 <script>
   import axios from "axios"
   import NavBar from '../components/NavBar.vue'
-  import VueJwtDecode from "vue-jwt-decode";
+  import { jwtDecode } from 'jwt-decode';
   import SearchUser from '../components/sidebar/SearchUser.vue';
   import Follow from '../components/follow/Follow.vue';
 
@@ -60,7 +60,7 @@
         try {
             const token = localStorage.getItem("nb.user");
             if (token) {
-                const decoded = VueJwtDecode.decode(token);
+                const decoded = jwtDecode(token);
                 if (decoded.user.username && decoded.user.username !== '') {
                     this.user = decoded.user                
                 }

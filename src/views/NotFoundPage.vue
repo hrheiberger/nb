@@ -63,7 +63,7 @@
 </template>
 
 <script>
-import VueJwtDecode from "vue-jwt-decode";
+import { jwtDecode } from 'jwt-decode';
 import "bootstrap/dist/css/bootstrap.css";
 
 export default {
@@ -79,7 +79,7 @@ export default {
     try {
       const token = localStorage.getItem("nb.user");
       if (token) {
-        const decoded = VueJwtDecode.decode(token);
+        const decoded = jwtDecode(token);
         if (decoded.user.username && decoded.user.username !== "") {
           this.isLoggedIn = true
         }

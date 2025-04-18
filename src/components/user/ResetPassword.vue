@@ -120,7 +120,7 @@
 
 <script>
     import axios from "axios"
-    import VueJwtDecode from "vue-jwt-decode";
+    import { jwtDecode } from 'jwt-decode';
     import { eventBus } from "../../main"
 
 
@@ -150,7 +150,7 @@
         created: function() {
             const token = localStorage.getItem("nb.user");
             if (token) {
-                const decoded = VueJwtDecode.decode(token);
+                const decoded = jwtDecode(token);
                 if (decoded.user.username && decoded.user.username !== '') {
                         this.newUser.username = decoded.user.username
                         this.newUser.first = decoded.user.first_name

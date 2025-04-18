@@ -45,7 +45,7 @@
   import VTooltip from 'v-tooltip'
   import VModal from 'vue-js-modal'
   import Datepicker from 'vuejs-datepicker';
-  import VueJwtDecode from "vue-jwt-decode";
+  import { jwtDecode } from 'jwt-decode';
 
   Vue.use(VTooltip)
   Vue.use(VModal)
@@ -73,7 +73,7 @@
         try {
             const token = localStorage.getItem("nb.user");
             if (token) {
-                const decoded = VueJwtDecode.decode(token);
+                const decoded = jwtDecode(token);
                 if (!(decoded.user.username !== undefined && decoded.user.username !== "")) {
                     this.$router.push('/')
                 }   

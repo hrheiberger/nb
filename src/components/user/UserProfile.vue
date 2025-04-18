@@ -156,9 +156,7 @@
     import Vue from 'vue'
     import axios from "axios"
     import { eventBus } from "../../main"
-    import VueJwtDecode from "vue-jwt-decode";
-
-
+    import { jwtDecode } from 'jwt-decode';
 
     export default {
         name: "user-profile",
@@ -187,7 +185,7 @@
         created: async function() {
             const token = localStorage.getItem("nb.user");
             if (token) {
-                const decoded = VueJwtDecode.decode(token);
+                const decoded = jwtDecode(token);
                 if (decoded.user.username && decoded.user.username !== '') {
                         this.newUser.username = decoded.user.username
                         this.newUser.first = decoded.user.first_name
