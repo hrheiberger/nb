@@ -67,7 +67,11 @@ export default {
     let token;
     if (state.type == "SIGN_UP") {
       // Handle OAuth failure
-      if (this.$route.query.error != undefined) {
+      const error = this.$route.query.error;
+      if (error) {
+        if (error == "access_denied") {
+          localStorage.setItem("nb.auth_error_message", "Auth Error: User denied Canvas access request");
+        }
         setTimeout(() => {
           window.close();
         }, 250);
@@ -92,7 +96,13 @@ export default {
           return;
         }
       } catch (error) {
-        console.log(error);
+        const error_message = error.response.data.msg;
+        if (error_message == "already linked") {
+          localStorage.setItem("nb.auth_error_message", "There is already an NB account linked to this Canvas account. Log in with Canvas or Reset Password to gain access.");
+        }
+        else if (error_message == "username must be unique") {
+          localStorage.setItem("nb.auth_error_message", "There is already an account configured for your username. Reset Password to gain access.");
+        }
         setTimeout(() => {
           window.close();
         }, 250);
@@ -100,7 +110,11 @@ export default {
       }
     } else if (state.type == "LOGIN") {
       // Handle OAuth failure
-      if (this.$route.query.error != undefined) {
+      const error = this.$route.query.error;
+      if (error) {
+        if (error == "access_denied") {
+          localStorage.setItem("nb.auth_error_message", "Auth Error: User denied Canvas access request");
+        }
         setTimeout(() => {
           window.close();
         }, 250);
@@ -125,7 +139,10 @@ export default {
           return;
         }
       } catch (error) {
-        console.log(error);
+        const error_message = error.response.data.msg;
+        if (error_message.startsWith("No NB account linked")) {
+          localStorage.setItem("nb.auth_error_message", error_message);
+        }
         setTimeout(() => {
           window.close();
         }, 250);
@@ -133,7 +150,11 @@ export default {
       }
     } else if (state.type == "LINK") {
       // Handle OAuth failure
-      if (this.$route.query.error != undefined) {
+      const error = this.$route.query.error;
+      if (error) {
+        if (error == "access_denied") {
+          localStorage.setItem("nb.auth_error_message", "Auth Error: User denied Canvas access request");
+        }
         setTimeout(() => {
           window.close();
         }, 250);
@@ -160,7 +181,10 @@ export default {
           return;
         }
       } catch (error) {
-        console.log(error);
+        const error_message = error.response.data.msg;
+        if (error_message == "already linked") {
+          localStorage.setItem("nb.auth_error_message", "Canvas account already linked to another NB account. Unlink it there first to proceed!");
+        }
         setTimeout(() => {
           window.close();
         }, 250);

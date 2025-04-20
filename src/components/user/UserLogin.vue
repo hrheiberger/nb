@@ -101,8 +101,14 @@
 
                         // Verify Login Successful
                         const token = localStorage.getItem("nb.user");
-                        if (token == undefined) {
-                            this.message = "Invalid Canvas user. Try again!";
+                        if (!token) {
+                            const error_message = localStorage.getItem("nb.auth_error_message"); 
+                            if (error_message) { // Error set in CanvasLoginPage view
+                                localStorage.removeItem("nb.auth_error_message");
+                                this.message = error_message;
+                            } else { // Unknown error
+                                this.message = "Canvas login failed.  Please try again later...";
+                            }
                             return;
                         }
 

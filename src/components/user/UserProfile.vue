@@ -302,13 +302,20 @@ import { decode } from 'jsonwebtoken';
                             clearInterval(interval);
                             main_tab.focus();
 
-                            // Verify Login Successful
+                            // Verify Link Successful
                             const token = localStorage.getItem("nb.user") || "";
                             const decoded = jwtDecode(token);
                             if (!decoded || !decoded.user || !decoded.user.canvas_refresh_token || decoded.user.canvas_refresh_token == old_refresh_token) {
-                                this.setLinkMessage("Link Error: Please try again");
+                                const error_message = localStorage.getItem("nb.auth_error_message"); 
+                                if (error_message) { // Error set in CanvasLoginPage view
+                                    localStorage.removeItem("nb.auth_error_message");
+                                    this.setLinkMessage(error_message);
+                                } else { // Unknown error
+                                    this.setLinkMessage("Link Error: Please try again later...");
+                                }
                                 return;
                             }
+                            
                             this.setLinkMessage("Link successful");
                             this.isCanvasUser = true;
                             localStorage.setItem("nb.user", token);

@@ -145,7 +145,7 @@ router.post('/login-canvas', async (req, res) => {
 
   let user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${canvas_profile.id}` } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
   if (!user) {
-    res.status(401).json({ msg: "No user with username " + canvas_profile.login_id.split('@')[0] });
+    res.status(401).json({ msg: "No NB account linked to Canvas user " + canvas_profile.login_id.split('@')[0] + "."});
   } else {
     user = await user.update({ canvas_refresh_token: canvas_refresh_token });
     const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
@@ -230,6 +230,12 @@ router.post('/register-canvas', async (req, res) => {
     console.log("error:" + err);
     res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
     return;
+  }
+
+  // Verify Canvas profile not already linked to an NB account
+  const linked_user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${canvas_profile.id}` }}});
+  if (linked_user) {
+    res.status(400).json({ msg: "already linked" });
   }
 
   // Create user
@@ -375,6 +381,12 @@ router.post('/relink-canvas', passport.authenticate('jwt', { session: false }), 
     console.log("error:" + err);
     res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
     return;
+  }
+
+  // Verify Canvas profile not already linked to someone else
+  const linked_user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${canvas_profile.id}` }}});
+  if (linked_user && linked_user.id != user.id) {
+    res.status(400).json({ msg: "already linked" });
   }
 
   user = await user.update({ 

@@ -104,7 +104,8 @@ router.post('/import', async (req, res) => {
           first_name: profile.sortable_name.split(', ')[1],
           last_name: profile.sortable_name.split(', ')[0],
           email: profile.primary_email.toLowerCase(),
-          password: ""
+          password: "",
+          canvas_user_id: profile.id,
         });
       } catch (err) {} // Canvas user most likely already exists
     }

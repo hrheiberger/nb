@@ -222,8 +222,14 @@
 
                             // Verify Login Successful
                             const token = localStorage.getItem("nb.user");
-                            if (token == undefined) {
-                                this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
+                            if (!token) {
+                                const error_message = localStorage.getItem("nb.auth_error_message"); 
+                                if (error_message) { // Error set in CanvasLoginPage view
+                                    localStorage.removeItem("nb.auth_error_message");
+                                    this.setRegisterMessage(error_message);
+                                } else { // Unknown error
+                                    this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
+                                }
                                 return;
                             }
                             
