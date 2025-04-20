@@ -13,9 +13,6 @@
       ></iframe>
     </div>
     <div class="app-body">
-      <user-create></user-create>
-      <div class="v-divide"></div>
-      <user-login></user-login>
     </div>
     <a
       href="https://forms.gle/6YERC3jSu1W1zUzS8"
@@ -42,16 +39,6 @@ export default {
   },
   beforeMount: async function () {
     this.$isLoading(true);    
-    try {
-      const token = localStorage.getItem("nb.user");
-      if (token) {
-        setTimeout(() => {
-          window.close();
-        }, 250);
-      }
-    } catch (error) {
-      console.error(error, "error from decoding token");
-    }
 
     // Retrieve OAuth State
     let state = this.$route.query.state
@@ -63,6 +50,17 @@ export default {
     } 
     else {
       state = JSON.parse(decodeURIComponent(state));
+    }
+
+    try {
+      const token = localStorage.getItem("nb.user");
+      if (token && state.type != "LINK") {
+        setTimeout(() => {
+          window.close();
+        }, 250);
+      }
+    } catch (error) {
+      console.error(error, "error from decoding token");
     }
 
     // Handle OAuth Signup
@@ -133,12 +131,47 @@ export default {
         }, 250);
         return;
       }
+    } else if (state.type == "LINK") {
+      // Handle OAuth failure
+      if (this.$route.query.error != undefined) {
+        setTimeout(() => {
+          window.close();
+        }, 250);
+        return;
+      }
+      else if (this.$route.query.code == undefined) {
+        setTimeout(() => {
+          window.close();
+        }, 250);
+        return;    
+      }
+
+      // Verify OAuth code and Login
+      try {
+        const code = this.$route.query.code
+        token = localStorage.getItem("nb.user");
+        const headers = { headers: { Authorization: 'Bearer ' + token }}
+        const response = await axios.post("api/users/relink-canvas", {code}, headers);
+        token = response.data.token;
+        if (token == undefined) {
+          setTimeout(() => {
+            window.close();
+          }, 250);
+          return;
+        }
+      } catch (error) {
+        console.log(error);
+        setTimeout(() => {
+          window.close();
+        }, 250);
+        return;
+      }
     }
 
     // Login to User
     localStorage.setItem("nb.user", token);
     setTimeout(() => {
-          window.close();
+      window.close();
     }, 250);   
 
   },

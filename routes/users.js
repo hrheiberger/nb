@@ -68,10 +68,22 @@ router.post('/login', async (req, res) => {
   const password = req.body.password;
 
   const user = await User.findOne({ where: { username: { [Op.iLike]: username } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
-
   if (!user) {
     res.status(401).json({ msg: "No user with username " + username });
+  } 
+
+  // If Canvas user, get access token
+  if (user.canvas_refresh_token) {
+    await refreshCanvasAccessToken(user, res);
+  }
+
+  if (user.isCanvasOnly()) {
+    res.clearCookie('canvas_access_token');
+    res.clearCookie('is_canvas_user');
+    res.status(401).json({ msg: "User has no password set" });
   } else if (!user.validPassword(password)) {
+    res.clearCookie('canvas_access_token');
+    res.clearCookie('is_canvas_user');
     res.status(401).json({ msg: "Incorrect password" });
   } else {
     const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
@@ -110,18 +122,6 @@ router.post('/login-canvas', async (req, res) => {
     );
     canvas_access_token = response.data.access_token;
     canvas_refresh_token = response.data.refresh_token;
-    res.cookie('canvas_access_token', canvas_access_token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 3600000, // 1 hour
-    });
-    res.cookie('is_canvas_user', true, {
-      httpOnly: false,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 3600000, // 1 hour
-    });
   } catch (err) {
     console.log("error:" + err);
     res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
@@ -143,14 +143,24 @@ router.post('/login-canvas', async (req, res) => {
     return;
   }
 
-  const user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${canvas_profile.id}` } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
+  let user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${canvas_profile.id}` } }, include: [{ association: 'Consents' }, { association: 'Dissents' }] })
   if (!user) {
     res.status(401).json({ msg: "No user with username " + canvas_profile.login_id.split('@')[0] });
-  } else if (false && !user.isCanvas()) { // TODO: Enabling this doesn't allow user's with passwords to login with Canvas.  Do we want?
-    res.status(401).json({ msg: "Not canvas user" });
   } else {
-    await user.update({ canvas_refresh_token: canvas_refresh_token });
+    user = await user.update({ canvas_refresh_token: canvas_refresh_token });
     const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
+    res.cookie('canvas_access_token', canvas_access_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
+    res.cookie('is_canvas_user', true, {
+      httpOnly: false,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
     res.status(200).json({ token });
   }
 });
@@ -170,6 +180,10 @@ router.post('/register', (req, res) => {
   })
 });
 
+/**
+ * Register a new user using Canvas OAuth
+ * @name POST/api/users/register-canvas
+ */
 router.post('/register-canvas', async (req, res) => {
   const client_id = process.env.VUE_APP_CLIENT_ID;
   const client_secret = process.env.CLIENT_SECRET;
@@ -197,18 +211,6 @@ router.post('/register-canvas', async (req, res) => {
     );
     canvas_access_token = response.data.access_token;
     canvas_refresh_token = response.data.refresh_token;    
-    res.cookie('canvas_access_token', canvas_access_token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 3600000, // 1 hour
-    });
-    res.cookie('is_canvas_user', true, {
-      httpOnly: false,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 3600000, // 1 hour
-    });
   } catch (err) {
     console.log("error:" + err);
     res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
@@ -255,11 +257,27 @@ router.post('/register-canvas', async (req, res) => {
     res.status(500).json({ msg: "Couldn't create user"});
   }  else {
     const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
+    res.cookie('canvas_access_token', canvas_access_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
+    res.cookie('is_canvas_user', true, {
+      httpOnly: false,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 3600000, // 1 hour
+    });
     res.status(200).json({ token });
     return;
   }
 });
 
+/**
+ * Refresh the request user's Canvas access token
+ * @name GET/api/users/refresh-canvas
+ */
 router.get('/refresh-canvas', passport.authenticate('jwt', { session: false }), async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
@@ -273,6 +291,112 @@ router.get('/refresh-canvas', passport.authenticate('jwt', { session: false }), 
   }
 });
 
+/**
+ * Unlink the request user from their associated Canvas account
+ * @name POST/api/users/unlink-canvas
+ */
+router.post('/unlink-canvas', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  try {
+    let user = await User.findByPk(req.user.id, { attributes: ['id', 'username', 'name', "email", "password"], include: [{ association: 'Consents' }, { association: 'Dissents' }] });
+    if (!user) {
+      return res.status(401).json({ msg: "Cannot find user"});
+    }
+    user = await user.update({
+      canvas_refresh_token: null,
+      canvas_user_id: null,
+    })
+    if (user.isCanvasOnly()) {
+      return res.status(403).json({ msg: "Canvas only user"});
+    }
+    delete user.password;
+    res.clearCookie('canvas_access_token');
+    res.clearCookie('is_canvas_user');
+    const token = jwt.sign({ user: user.get({ plain: true}) }, process.env.JWT_SECRET);
+    res.status(200).json({ token });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ msg: "Error unlinking Canvas profile"});
+  }
+});
+
+/**
+ * Link the request user to a new Canvas account
+ * @name POST/api/users/relink-canvas
+ */
+router.post('/relink-canvas', passport.authenticate('jwt', { session: false }), async (req, res) => {
+  const client_id = process.env.VUE_APP_CLIENT_ID;
+  const client_secret = process.env.CLIENT_SECRET;
+  const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
+
+  // Authenticate user
+  let user = await User.findByPk(req.user.id, { attributes: ['id', 'username', 'name', "email"], include: [{ association: 'Consents' }, { association: 'Dissents' }] });
+  if (!user) {
+    return res.status(401).json({ msg: "Cannot find user"});
+  }
+
+  // Verify OAuth Code
+  let canvas_access_token;
+  let canvas_refresh_token;
+  try {
+    const response = await axios.post(
+      'https://canvas.mit.edu/login/oauth2/token',
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id,
+        client_secret,
+        redirect_uri,
+        expires_in: 3600,
+        code: req.body.code
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+    canvas_access_token = response.data.access_token;
+    canvas_refresh_token = response.data.refresh_token;
+  } catch (err) {
+    console.log("error:" + err);
+    res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+    return;
+  }
+
+  // Get Canvas Profile
+  let canvas_profile;
+  try {
+    const response = await axios.get('https://canvas.mit.edu/api/v1/users/self/profile', {
+      headers: {
+        Authorization: `Bearer ${canvas_access_token}`
+      }
+    });
+    canvas_profile = response.data;
+  } catch (err) {
+    console.log("error:" + err);
+    res.status(400).json({ msg: err.response?.data?.error_description || "OAuth failed"  })
+    return;
+  }
+
+  user = await user.update({ 
+    canvas_user_id: canvas_profile.id,
+    canvas_refresh_token: canvas_refresh_token,
+  });
+  const token = jwt.sign({ user: user.get({ plain: true})}, process.env.JWT_SECRET);
+  res.cookie('canvas_access_token', canvas_access_token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 3600000, // 1 hour
+  });
+  res.cookie('is_canvas_user', true, {
+    httpOnly: false,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 3600000, // 1 hour
+  });
+  res.status(200).json({ token });
+});
+
 router.post('/forgotpassword', (req, res) => {
   var reset_password_id = uuidv4();
   var link = req.headers.origin + "/reset?id=" + reset_password_id;
@@ -280,9 +404,6 @@ router.post('/forgotpassword', (req, res) => {
   User.findOne({ where: { email: { [Op.iLike]: req.body.email } } }).then(function (user) {
     if (!user) {
       res.status(401).json({ msg: "No user with email " + req.body.email });
-      return;
-    } else if (false && user.isCanvas()) { // TODO: Enabling this doesn't allow Canvas user's to set passwords to their acount.  Do we want?
-      res.status(401).json({ msg: "Please use Canvas login" });
       return;
     } else {
       user.update({

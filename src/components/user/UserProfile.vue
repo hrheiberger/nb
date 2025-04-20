@@ -23,6 +23,19 @@
         <span class="profile-message"><br>{{personalMessage}}<br></span>
         <br>
         <hr/>
+        <div>
+            <h2>Canvas Linking</h2>
+            <div class="group">
+                <label> Status: </label>
+                <span class="link-status"> {{this.isCanvasUser ? "Linked" : "Unlinked"}} </span>
+            </div>
+            <button class="submit" id="link" @click="linkCanvas">{{this.isCanvasUser ? "Link with New Account" : "Link"}}</button>
+            <div v-if="isCanvasUser">
+                <button class="submit" id="unlink" @click="unlinkCanvas">Unlink</button>
+            </div>
+            <span class="profile-message"><br>{{linkMessage}}<br></span>
+            <hr/>
+        </div>
         <h2>Authentication</h2>
         <div class="group">
             <label for="new-user-newpassword"> New Password: </label>
@@ -157,6 +170,7 @@
     import axios from "axios"
     import { eventBus } from "../../main"
     import { jwtDecode } from 'jwt-decode';
+import { decode } from 'jsonwebtoken';
 
     export default {
         name: "user-profile",
@@ -174,23 +188,37 @@
                     retypepassword: "",
                 },
                 personalMessage: "",
+                linkMessage: "",
                 authMessage: "",
                 consentsMessage: "",
                 ucdavisIRB: null,
                 nbIRB: null,
                 emailPreferences: {},
                 updatedEmailPreferences: {},
+                isCanvasUser: false,
             }
         },
         created: async function() {
+            this.isCanvasUser = document.cookie.includes('is_canvas_user=true');
             const token = localStorage.getItem("nb.user");
             if (token) {
                 const decoded = jwtDecode(token);
                 if (decoded.user.username && decoded.user.username !== '') {
-                        this.newUser.username = decoded.user.username
-                        this.newUser.first = decoded.user.first_name
-                        this.newUser.last = decoded.user.last_name
-                        this.newUser.email = decoded.user.email
+                    // Refresh Canvas Access token if expired
+                    if (decoded.user.canvas_refresh_token && !this.isCanvasUser) {
+                        const headers = { headers: { Authorization: "Bearer " + token } };
+                        try {
+                            await axios.get(`/api/users/refresh-canvas`, headers);
+                            this.isCanvasUser = true;
+                        } catch {
+                            this.isCanvasUser = false;
+                        }
+                    }
+
+                    this.newUser.username = decoded.user.username
+                    this.newUser.first = decoded.user.first_name
+                    this.newUser.last = decoded.user.last_name
+                    this.newUser.email = decoded.user.email
                 } 
                 decoded.user.Consents.forEach(consent => consent.name === 'NB' ? this.nbIRB = 'true' : null)
                 decoded.user.Dissents.forEach(consent => consent.name === 'NB' ? this.nbIRB = 'false' : null)
@@ -255,6 +283,63 @@
                 }).catch(() => {
                     this.setPersonalMessage("Error: This username or email is already taken. Please try again.", false)
                 })
+            },
+            linkCanvas: async function() {
+                const old_refresh_token = jwtDecode(localStorage.getItem("nb.user")).user.canvas_refresh_token;
+                console.log(old_refresh_token)                   
+                try {
+                    // Open Canvas OAuth Login Window
+                    const client_id = process.env.VUE_APP_CLIENT_ID;
+                    const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
+                    const state = encodeURIComponent(JSON.stringify({code: 123, type: "LINK"}));
+                    const scopes = encodeURIComponent("url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/users url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
+                    const main_tab = document.activeElement;
+                    const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
+                    
+                    // Wait for OAuth Login to finish
+                    const interval = setInterval(async () => {
+                        if (login_tab.closed) {
+                            clearInterval(interval);
+                            main_tab.focus();
+
+                            // Verify Login Successful
+                            const token = localStorage.getItem("nb.user") || "";
+                            const decoded = jwtDecode(token);
+                            if (!decoded || !decoded.user || !decoded.user.canvas_refresh_token || decoded.user.canvas_refresh_token == old_refresh_token) {
+                                this.setLinkMessage("Link Error: Please try again");
+                                return;
+                            }
+                            this.setLinkMessage("Link successful");
+                            this.isCanvasUser = true;
+                            localStorage.setItem("nb.user", token);
+                        }
+                    })
+                } catch (err) {
+                    this.message = "Invalid Canvas user. Try again!";
+                    console.error(`Signin failed: ${err.response.data.error}`)
+                }
+            },
+            unlinkCanvas: async function() {
+                const token = localStorage.getItem("nb.user");
+                const headers = { headers: { Authorization: 'Bearer ' + token }}
+                try {
+                    const token = (await axios.post("api/users/unlink-canvas", {}, headers)).data.token;
+                    if (token == undefined) {
+                        this.setLinkMessage("Unlink Error: Please try again later", true);
+                        return;
+                    }
+                    localStorage.setItem("nb.user", token);
+                    this.isCanvasUser = false;
+                    this.setLinkMessage("Success: Canvas profile unlinked", true);
+                } catch (err) {
+                    const message = err.response.data.msg || "";
+                    if (message.includes("Canvas only user")) {
+                        this.setLinkMessage("Unlink Failed: Set a password first", true);
+                    }
+                    else {
+                        this.setLinkMessage("Unlink Failed: Please try again later", true);
+                    }
+                }
             },
             editAuth: async function() {
                 const token = localStorage.getItem("nb.user");
@@ -334,6 +419,12 @@
                     setTimeout(() => this.personalMessage = "", 5000);
                 }
             },
+            setLinkMessage: function(msg, disappear=true) {
+                this.linkMessage = msg;
+                if (disappear) {
+                    setTimeout(() => this.linkMessage = "", 5000);
+                }
+            },
             setAuthMessage: function(msg, disappear=true) {
                 this.authMessage = msg;
                 if (disappear) {
@@ -399,6 +490,7 @@
     color: #fff;
     font-size: 16px;
     cursor: pointer;
+    margin-bottom: 4px;
   }
 
   button.cancel {
@@ -486,5 +578,9 @@
     font-size: 30px;
     cursor: pointer;
     color: #4a2270;
+}
+
+.link-status {
+    font-weight: bold;
 }
 </style>

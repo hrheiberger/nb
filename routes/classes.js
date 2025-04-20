@@ -94,7 +94,7 @@ router.post('/import', async (req, res) => {
     const section = student.section;
 
     // Get student NB profile
-    let user = await User.findOne({ where: { email: { [Op.iLike]: profile.primary_email } } });
+    let user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${profile.id}` } } });
 
     // If user doesn't already exist -> register them first
     if (user === null) { 
@@ -106,7 +106,7 @@ router.post('/import', async (req, res) => {
           email: profile.primary_email.toLowerCase(),
           password: ""
         });
-      } catch (err) {} // Canvas user already exists
+      } catch (err) {} // Canvas user most likely already exists
     }
 
     if (role === "TeacherEnrollment") {
@@ -116,11 +116,14 @@ router.post('/import', async (req, res) => {
       await nb_class.addClassTAs(user);
     }
     else if (role === "StudentEnrollment") {
-      if (section != "") {
+      if (section) {
         utils.addStudentToSection(nb_class, user, section);
       } else {
         utils.addStudent(nb_class.id, user.id);
       }
+    }
+    else {
+      console.log(`Error: Import student not added: ${profile} with role ${role}`);
     }
   }
 
