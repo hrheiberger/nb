@@ -2,7 +2,7 @@
   <div class="canvas-course-create">
     <h6> Import a New Class From Canvas </h6>
     <select class="group" v-model="selectedCanvasCourse" required>
-      <option disabled value="">Select course</option>
+      <option disabled value="">Choose a course</option>
       <option v-for="canvasCourse in canvasCourses" :key="canvasCourse.id" :value="canvasCourse">
         {{ canvasCourse.name }}
       </option>

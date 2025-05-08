@@ -1,7 +1,7 @@
 <template>
   <div class="form">
     <h3 class="title">Sign in</h3>
-
+    
     <div class="group">
       <label for="login-username"> Username: </label>
       <input id="login-username" type="text" v-model="user.username">
@@ -17,10 +17,28 @@
     <button class="submit" :disabled="!submitEnabled" @click="login">
       Sign in
     </button>
-    <button class="submit" @click="loginCanvas">
+
+    <div class="separator">
+      <span class="separator-text">or</span>
+    </div>
+
+    <h3 class="title">Sign in with Canvas</h3>
+    <div class="group">
+      <label id="university-select-label" for="university-select"> Select University: </label>
+      <select id="university-select" v-model="selectedUniversity">
+      <option disabled value="">Choose a university</option>
+      <option v-for="university in universities" :key="university.name" :value="university.canvas_url">
+        {{ university.name }}
+      </option>
+      </select>
+    </div>
+
+    <button class="submit" :disabled="!loginCanvasEnabled" @click="loginCanvas">
       Sign in with Canvas
     </button>
-    <br><br>
+
+    <div class="separator before-reset" />
+    
     <h3 class="title">Reset Your Password</h3>
     <div class="group">
       <label for="login-email"> Email: </label>
@@ -49,6 +67,8 @@
     name: "user-login",
     data() {
       return {
+        selectedUniversity: null,
+        universities: [],
         user: {
           username: "",
           password: "",
@@ -58,20 +78,32 @@
         message: null,
       }
     },
+    beforeMount() {
+      axios.get("/api/canvas/universities")
+        .then(res => {
+          this.universities = res.data;
+        })
+        .catch(err => {
+          console.error(`Error fetching universities: ${err}`)
+        })
+    },
     computed: {
       submitEnabled: function() {
         return this.user.username.length > 0 && this.user.password.length > 0
       },
       forgotPasswordEnabled: function() {
         return this.user.email && this.user.email.length > 0
-      }
+      },
+      loginCanvasEnabled: function() {
+        return this.selectedUniversity;
+      },
     },
     methods: {
         login: async function() {
             try {
                 if(!this.submitEnabled) return
                 const res = await axios.post("/api/users/login", this.user)
-                const token = res.data.token
+                const token = res.data.token;
                 localStorage.setItem("nb.user", token);
                 eventBus.$emit('signin-success')
                 this.resetForm()
@@ -88,11 +120,10 @@
                 // Open Canvas OAuth Login Window
                 const client_id = process.env.VUE_APP_CLIENT_ID;
                 const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
-                const state = encodeURIComponent(JSON.stringify({code: 123, type: "LOGIN"}));
-                const scopes = encodeURIComponent("url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/students url:GET|/api/v1/courses/:course_id/users url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
+                const state = encodeURIComponent(JSON.stringify({code: 123, canvas_url: this.selectedUniversity, type: "LOGIN"}));
+                const scopes = encodeURIComponent("url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/users url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
                 const main_tab = document.activeElement;
-                const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
-                
+                const login_tab = window.open(`https://${this.selectedUniversity}/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
                 // Wait for OAuth Login to finish
                 const interval = setInterval(async () => {
                     if (login_tab.closed) {
@@ -152,6 +183,41 @@
 </script>
 
 <style scoped>
+  #university-select-label {
+    white-space: nowrap;
+  }
+  #university-select {
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 3px;
+    border: solid 1px #aaa;
+    font-size: 16px;
+  }
+  .before-reset {
+    margin: 6px 0px 3px 0px;
+  }
+  .separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    width: 100%;            /* fills the container width */
+    color: #555;            /* text color */
+    font-weight: bold;
+    font-family: sans-serif;
+    font-size: 14px;
+  }
+
+  .separator::before,
+  .separator::after {
+    content: "";
+    flex: 1; /* lines take equal space */
+    border-bottom: 2px solid #9e9e9e; 
+  }
+  .separator-text {
+    padding: 0 10px; /* Only space around the text */
+    color: #555;
+    font-size: 14px;
+  }
   .form {
     width: 380px;
     display: flex;
@@ -183,6 +249,7 @@
   }
   button.submit {
     align-self: flex-end;
+    margin-bottom: 10px;
     padding: 10px 15px;
     border-radius: 5px;
     border: solid 1px #38155a;

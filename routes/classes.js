@@ -95,6 +95,9 @@ router.post('/import', async (req, res) => {
 
     // Get student NB profile
     let user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${profile.id}` } } });
+    if (user === null) {
+      user = await User.findOne({ where: { username: { [Op.iLike]: profile.login_id.split('@')[0] } } });
+    }
 
     // If user doesn't already exist -> register them first
     if (user === null) { 

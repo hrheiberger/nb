@@ -3,7 +3,6 @@ const router = express.Router();
 const NbConfig = require('../models').NbConfig;
 const UserEmailPreference = require('../models').UserEmailPreference
 
-
 /**
 * Serves homepage.
 * @name GET/
@@ -36,7 +35,7 @@ router.get('/api/nb/config', async (req, res) => {
 
 /**
 * Set my email preferences
-* @name POST /api/email/preference
+* @name POST /api/unsubscribe
 */
 router.post('/api/unsubscribe', async (req, res) => {
     const token = Buffer.from(req.body.token, 'base64').toString('ascii')?.split(':')

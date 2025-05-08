@@ -1,5 +1,15 @@
 const axios = require('axios');
 
+// List of Canvas-enabled universities
+// NOTE: This is a static list and should be updated as needed
+//  
+const canvasUniversities = [
+  {
+      name: "Massachusetts Institute of Technology",
+      canvas_url: "canvas.mit.edu",
+  },
+]
+
 async function getCanvasAccessToken(user) {
   if (!user?.canvas_refresh_token) {
     return null;
@@ -47,4 +57,4 @@ async function refreshCanvasAccessToken(user, res) {
     return canvas_access_token;
 }
 
-module.exports = { refreshCanvasAccessToken };
+module.exports = { refreshCanvasAccessToken,  canvasUniversities};
