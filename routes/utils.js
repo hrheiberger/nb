@@ -1,14 +1,23 @@
 const axios = require('axios');
+const donenv = require('dotenv');
+
+donenv.config();
 
 // List of Canvas-enabled universities
 // NOTE: This is a static list and should be updated as needed
-//  
 const canvasUniversities = [
   {
-      name: "Massachusetts Institute of Technology",
-      canvas_url: "canvas.mit.edu",
+      name: "Massachusetts Institute of Technology", // Name shown on CanvasSplitButton Dropdown
+      short_name: "MIT", // Name shown when university selected
+      canvas_url: "canvas.mit.edu", // Canvas URL for the university
   },
-]
+];
+
+// List of client secrets for Canvas-enabled universities
+// NOTE: This is a static list and should be updated as needed
+const canvasSecret = {
+  "canvas.mit.edu": process.env.MIT_CLIENT_SECRET,
+};
 
 async function getCanvasAccessToken(user) {
   if (!user?.canvas_refresh_token) {
@@ -16,7 +25,7 @@ async function getCanvasAccessToken(user) {
   }
 
   const client_id = process.env.VUE_APP_CLIENT_ID;
-  const client_secret = process.env.CLIENT_SECRET;
+  const client_secret = process.env.MIT_CLIENT_SECRET;
   try { 
     const refresh_response = await axios.post(
       'https://canvas.mit.edu/login/oauth2/token',
@@ -57,4 +66,4 @@ async function refreshCanvasAccessToken(user, res) {
     return canvas_access_token;
 }
 
-module.exports = { refreshCanvasAccessToken,  canvasUniversities};
+module.exports = { refreshCanvasAccessToken,  canvasUniversities, canvasSecret};

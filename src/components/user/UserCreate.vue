@@ -1,6 +1,17 @@
 <template>
     <div class="form">
         <h3 class="title">Create a New Account</h3>
+        <CanvasSplitButton
+            :enabled="submitEnabledCanvas"
+            :buttonText=buttonText
+            @main-click="createUserCanvas"
+            @select="onSelectUniversity"
+        />
+        <span class="register-message">{{canvasMessage}}</span>
+
+        <div class="separator">
+            <span class="separator-text">or</span>
+        </div>
 
         <div class="group">
             <label for="new-user-username"> Username: </label>
@@ -26,6 +37,12 @@
             <label for="new-user-password"> Password: </label>
             <input id="new-user-password" type="password" v-model="newUser.password">
         </div>
+
+        <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
+
+        <span class="register-message">{{registerMessage}}</span>
+
+        <div class="separator before-reset" />
 
         <div class="nb-">
             <div class="nb-irb">
@@ -123,21 +140,20 @@
             <input type="radio" id="ucdavisIRBNo" value="false" v-model="ucdavisIRB">
             <label for="ucdavisIRBNo">No</label>
         </div>
-
-        <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
-        <button class="submit" :disabled="!submitEnabledCanvas" @click="createUserCanvas">Sign up with Canvas</button>
-        <span class="register-message"><br>{{registerMessage}}<br></span>
     </div>
 </template>
 
 <script>
     import axios from "axios"
+    import CanvasSplitButton from './CanvasSplitButton.vue'
     import { eventBus } from "../../main"
 
     export default {
         name: "user-create",
+        components: { CanvasSplitButton },
         data() {
             return {
+                selectedUniversity: null,
                 newUser: {
                     username: "",
                     first: "",
@@ -146,6 +162,7 @@
                     password: "",
                 },
                 registerMessage: "",
+                canvasMessage: "",
                 ucdavisIRB: null,
                 nbIRB: null,
             }
@@ -163,9 +180,13 @@
             submitEnabledCanvas: function() {
                 return this.nbIRB!== null
                         && ((this.needUCDIRB && this.ucdavisIRB!== null) || (!this.needUCDIRB))
+                        && (this.selectedUniversity != null)
             },
             needUCDIRB: function() {
                 return this.newUser.email.includes('@ucdavis.edu')
+            },
+            buttonText: function() {
+                return this.selectedUniversity != null ? `Sign up with \n${this.selectedUniversity.short_name} Canvas` : "Sign up with Canvas"
             },
         },
         methods: {
@@ -204,15 +225,18 @@
                     } 
                 }
             },
+            onSelectUniversity: function(university) {
+                this.selectedUniversity = university;
+            },
             createUserCanvas: async function() {
                 try {
                     // Open Canvas OAuth Login Window
                     const client_id = process.env.VUE_APP_CLIENT_ID;
                     const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
-                    const state = encodeURIComponent(JSON.stringify({code: 123, type: "SIGN_UP"}));
+                    const state = encodeURIComponent(JSON.stringify({code: 123, canvas_url: this.selectedUniversity.canvas_url, type: "SIGN_UP"}));
                     const scopes = encodeURIComponent("url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/users url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
                     const main_tab = document.activeElement;
-                    const login_tab = window.open(`https://canvas.mit.edu/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
+                    const login_tab = window.open(`https://${this.selectedUniversity.canvas_url}/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
                     
                     // Wait for OAuth Login to finish
                     const interval = setInterval(async () => {
@@ -226,9 +250,9 @@
                                 const error_message = localStorage.getItem("nb.auth_error_message"); 
                                 if (error_message) { // Error set in CanvasLoginPage view
                                     localStorage.removeItem("nb.auth_error_message");
-                                    this.setRegisterMessage(error_message);
+                                    this.setCanvasMessage(error_message);
                                 } else { // Unknown error
-                                    this.setRegisterMessage("Canvas sign up failed.  Please try again later...");
+                                    this.setCanvasMessage("Canvas sign up failed.  Please try again later...");
                                 }
                                 return;
                             }
@@ -255,12 +279,12 @@
                     console.error(`Signup failed: ${msg}`)
                     if (msg.includes("unique")) {
                         if (msg.includes("username")) {
-                            this.setRegisterMessage("There is already any account configured for this username. Please use a different one, or you can use the Reset Password option to access the account.")
+                            this.setCanvasMessage("There is already any account configured for this username. Please use a different one, or you can use the Reset Password option to access the account.")
                         } else if (msg.includes("email")) {
-                            this.setRegisterMessage("There is already any account configured for this email. Please use a different one, or you can use the Reset Password option to access the account.")
+                            this.setCanvasMessage("There is already any account configured for this email. Please use a different one, or you can use the Reset Password option to access the account.")
                         }
                     } else if (msg.includes("isEmail")) {
-                        this.setRegisterMessage("Please enter a valid email with the correct format, such as test@mail.com")
+                        this.setCanvasMessage("Please enter a valid email with the correct format, such as test@mail.com")
                     }  
                 }
             },
@@ -279,11 +303,43 @@
                     setTimeout(() => this.registerMessage = "", 10000);
                 }
             },
+            setCanvasMessage: function(msg, disappear=true) {
+                this.canvasMessage = msg;
+                if (disappear) {
+                    setTimeout(() => this.canvasMessage = "", 10000);
+                }
+            },
         },
     }
 </script>
 
 <style scoped>
+  .separator {
+    display: flex;
+    margin-bottom: 10px;
+    align-items: center;
+    text-align: center;
+    width: 100%;            /* fills the container width */
+    color: #555;            /* text color */
+    font-weight: bold;
+    font-family: sans-serif;
+    font-size: 14px;
+  }
+
+  .separator::before,
+  .separator::after {
+    content: "";
+    flex: 1; /* lines take equal space */
+    border-bottom: 2px solid #9e9e9e; 
+  }
+  .separator-text {
+    padding: 0 10px; /* Only space around the text */
+    color: #555;
+    font-size: 14px;
+  }
+  .before-reset {
+    margin: 15px 0px 10px 0px;
+  }
 .form {
     width: 380px;
     display: flex;
@@ -309,7 +365,7 @@
     font-size: 16px;
     flex-grow: 1;
 }
-  button.submit {
+button.submit {
     align-self: flex-end;
     padding: 10px 15px;
     border-radius: 5px;
@@ -318,14 +374,14 @@
     color: #fff;
     font-size: 16px;
     cursor: pointer;
-  }
+}
 button.submit:disabled {
     cursor: not-allowed;
     opacity: 0.5;
 }
-  button.submit:enabled:hover {
+button.submit:enabled:hover {
     background-color: #38155a;
-  }
+}
 .nb-consent {
     margin: 10px 0 20px 0;
 }

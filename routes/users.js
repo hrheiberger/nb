@@ -97,7 +97,7 @@ router.post('/login', async (req, res) => {
  */
 router.post('/login-canvas', async (req, res) => {
   const client_id = process.env.VUE_APP_CLIENT_ID;
-  const client_secret = process.env.CLIENT_SECRET;
+  const client_secret = process.env.MIT_CLIENT_SECRET;
   const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
 
   // Verify OAuth Code
@@ -186,7 +186,7 @@ router.post('/register', (req, res) => {
  */
 router.post('/register-canvas', async (req, res) => {
   const client_id = process.env.VUE_APP_CLIENT_ID;
-  const client_secret = process.env.CLIENT_SECRET;
+  const client_secret = process.env.MIT_CLIENT_SECRET;
   const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
 
   // Verify OAuth Code
@@ -331,7 +331,7 @@ router.post('/unlink-canvas', passport.authenticate('jwt', { session: false }), 
  */
 router.post('/relink-canvas', passport.authenticate('jwt', { session: false }), async (req, res) => {
   const client_id = process.env.VUE_APP_CLIENT_ID;
-  const client_secret = process.env.CLIENT_SECRET;
+  const client_secret = process.env.MIT_CLIENT_SECRET;
   const redirect_uri = process.env.VUE_APP_CANVAS_REDIRECT_URI;
 
   // Authenticate user

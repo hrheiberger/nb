@@ -1,7 +1,19 @@
 <template>
   <div class="form">
     <h3 class="title">Sign in</h3>
+    <CanvasSplitButton
+      :enabled="loginCanvasEnabled"
+      :buttonText=buttonText
+      @main-click="loginCanvas"
+      @select="onSelectUniversity"
+    />
+
+    <div v-if="canvas_message" class="message">{{ canvas_message }}</div>
     
+    <div class="separator">
+      <span class="separator-text">or</span>
+    </div>
+
     <div class="group">
       <label for="login-username"> Username: </label>
       <input id="login-username" type="text" v-model="user.username">
@@ -16,25 +28,6 @@
 
     <button class="submit" :disabled="!submitEnabled" @click="login">
       Sign in
-    </button>
-
-    <div class="separator">
-      <span class="separator-text">or</span>
-    </div>
-
-    <h3 class="title">Sign in with Canvas</h3>
-    <div class="group">
-      <label id="university-select-label" for="university-select"> Select University: </label>
-      <select id="university-select" v-model="selectedUniversity">
-      <option disabled value="">Choose a university</option>
-      <option v-for="university in universities" :key="university.name" :value="university.canvas_url">
-        {{ university.name }}
-      </option>
-      </select>
-    </div>
-
-    <button class="submit" :disabled="!loginCanvasEnabled" @click="loginCanvas">
-      Sign in with Canvas
     </button>
 
     <div class="separator before-reset" />
@@ -54,6 +47,7 @@
   import axios from "axios"
   import Vue from 'vue'
   import loading from 'vuejs-loading-screen'
+  import CanvasSplitButton from './CanvasSplitButton.vue'
   import { eventBus } from "../../main"
 
   Vue.use(loading, {
@@ -65,10 +59,10 @@
 
   export default {
     name: "user-login",
+    components: { CanvasSplitButton },
     data() {
       return {
         selectedUniversity: null,
-        universities: [],
         user: {
           username: "",
           password: "",
@@ -76,16 +70,8 @@
         },
         forgotPasswordMessage: "",
         message: null,
+        canvas_message: null,
       }
-    },
-    beforeMount() {
-      axios.get("/api/canvas/universities")
-        .then(res => {
-          this.universities = res.data;
-        })
-        .catch(err => {
-          console.error(`Error fetching universities: ${err}`)
-        })
     },
     computed: {
       submitEnabled: function() {
@@ -95,7 +81,10 @@
         return this.user.email && this.user.email.length > 0
       },
       loginCanvasEnabled: function() {
-        return this.selectedUniversity;
+        return this.selectedUniversity != null;
+      },
+      buttonText: function() {
+        return this.selectedUniversity != null ? `Sign in with \n${this.selectedUniversity.short_name} Canvas` : "Sign in with Canvas"
       },
     },
     methods: {
@@ -115,15 +104,18 @@
                 console.error(`Signin failed: ${err.response.data.error}`)
             }
         },
+        onSelectUniversity: function(university) {
+            this.selectedUniversity = university;
+        },
         loginCanvas: async function() {
             try {
                 // Open Canvas OAuth Login Window
                 const client_id = process.env.VUE_APP_CLIENT_ID;
                 const redirect_uri = encodeURIComponent(process.env.VUE_APP_CANVAS_REDIRECT_URI);
-                const state = encodeURIComponent(JSON.stringify({code: 123, canvas_url: this.selectedUniversity, type: "LOGIN"}));
+                const state = encodeURIComponent(JSON.stringify({code: 123, canvas_url: this.selectedUniversity.canvas_url, type: "LOGIN"}));
                 const scopes = encodeURIComponent("url:GET|/api/v1/courses/:course_id/sections url:GET|/api/v1/courses/:course_id/enrollments url:GET|/api/v1/users/:user_id/profile url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/users url:GET|/api/v1/courses/:course_id/assignments url:POST|/api/v1/courses/:course_id/assignments url:PUT|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id url:POST|/api/v1/courses/:course_id/assignments/:assignment_id/submissions/update_grades");
                 const main_tab = document.activeElement;
-                const login_tab = window.open(`https://${this.selectedUniversity}/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
+                const login_tab = window.open(`https://${this.selectedUniversity.canvas_url}/login/oauth2/auth?client_id=${client_id}&response_type=code&redirect_uri=${redirect_uri}&state=${state}&scope=${scopes}`, '_blank');
                 // Wait for OAuth Login to finish
                 const interval = setInterval(async () => {
                     if (login_tab.closed) {
@@ -136,9 +128,9 @@
                             const error_message = localStorage.getItem("nb.auth_error_message"); 
                             if (error_message) { // Error set in CanvasLoginPage view
                                 localStorage.removeItem("nb.auth_error_message");
-                                this.message = error_message;
+                                this.canvas_message = error_message;
                             } else { // Unknown error
-                                this.message = "Canvas login failed.  Please try again later...";
+                                this.canvas_message = "Canvas login failed.  Please try again later...";
                             }
                             return;
                         }
@@ -149,7 +141,7 @@
                     }
                 })
             } catch (err) {
-                this.message = "Invalid Canvas user. Try again!";
+                this.canvas_message = "Invalid Canvas user. Try again!";
                 console.error(`Signin failed: ${err.response.data.error}`)
             }
         },
@@ -157,8 +149,9 @@
             this.user = {
             username: "",
             password: "",
-            },
-            this.message = null
+            };
+            this.message = null;
+            this.canvas_message = null;
         },
         forgotPassword: function() {
             this.$isLoading(true) // show loading screen      
@@ -198,6 +191,7 @@
   }
   .separator {
     display: flex;
+    margin-bottom: 10px;
     align-items: center;
     text-align: center;
     width: 100%;            /* fills the container width */
@@ -258,10 +252,10 @@
     font-size: 16px;
     cursor: pointer;
   }
-button.submit:disabled {
+  button.submit:disabled {
     cursor: not-allowed;
     opacity: 0.5;
-}
+  }
   button.submit:enabled:hover {
     background-color: #38155a;
   }
