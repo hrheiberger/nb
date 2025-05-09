@@ -1,8 +1,8 @@
 <template>
   <div class="form">
     <h3 class="title">Sign in</h3>
-    <CanvasSplitButton
-      :enabled="loginCanvasEnabled"
+    <CanvasUniversitiesButton
+      :enabled="true"
       :buttonText=buttonText
       @main-click="loginCanvas"
       @select="onSelectUniversity"
@@ -47,7 +47,7 @@
   import axios from "axios"
   import Vue from 'vue'
   import loading from 'vuejs-loading-screen'
-  import CanvasSplitButton from './CanvasSplitButton.vue'
+  import CanvasUniversitiesButton from './CanvasUniversitiesButton.vue'
   import { eventBus } from "../../main"
 
   Vue.use(loading, {
@@ -59,7 +59,7 @@
 
   export default {
     name: "user-login",
-    components: { CanvasSplitButton },
+    components: { CanvasUniversitiesButton },
     data() {
       return {
         selectedUniversity: null,
@@ -79,9 +79,6 @@
       },
       forgotPasswordEnabled: function() {
         return this.user.email && this.user.email.length > 0
-      },
-      loginCanvasEnabled: function() {
-        return this.selectedUniversity != null;
       },
       buttonText: function() {
         return this.selectedUniversity != null ? `Sign in with \n${this.selectedUniversity.short_name} Canvas` : "Sign in with Canvas"
@@ -104,8 +101,9 @@
                 console.error(`Signin failed: ${err.response.data.error}`)
             }
         },
-        onSelectUniversity: function(university) {
+        onSelectUniversity: async function(university) {
             this.selectedUniversity = university;
+            await this.loginCanvas();
         },
         loginCanvas: async function() {
             try {
@@ -194,8 +192,8 @@
     margin-bottom: 10px;
     align-items: center;
     text-align: center;
-    width: 100%;            /* fills the container width */
-    color: #555;            /* text color */
+    width: 100%;            
+    color: #555;           
     font-weight: bold;
     font-family: sans-serif;
     font-size: 14px;

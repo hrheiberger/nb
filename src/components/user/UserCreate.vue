@@ -1,48 +1,6 @@
 <template>
     <div class="form">
         <h3 class="title">Create a New Account</h3>
-        <CanvasSplitButton
-            :enabled="submitEnabledCanvas"
-            :buttonText=buttonText
-            @main-click="createUserCanvas"
-            @select="onSelectUniversity"
-        />
-        <span class="register-message">{{canvasMessage}}</span>
-
-        <div class="separator">
-            <span class="separator-text">or</span>
-        </div>
-
-        <div class="group">
-            <label for="new-user-username"> Username: </label>
-            <input id="new-user-username" type="text" v-model="newUser.username">
-        </div>
-
-        <div class="group">
-            <label for="new-user-first"> First name: </label>
-            <input id="new-user-first" type="text" v-model="newUser.first">
-        </div>
-
-        <div class="group">
-            <label for="new-user-last"> Last name: </label>
-            <input id="new-user-last" type="text" v-model="newUser.last">
-        </div>
-
-        <div class="group">
-            <label for="new-user-email"> Email: </label>
-            <input id="new-user-email" type="text" v-model="newUser.email">
-        </div>
-
-        <div class="group">
-            <label for="new-user-password"> Password: </label>
-            <input id="new-user-password" type="password" v-model="newUser.password">
-        </div>
-
-        <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
-
-        <span class="register-message">{{registerMessage}}</span>
-
-        <div class="separator before-reset" />
 
         <div class="nb-">
             <div class="nb-irb">
@@ -140,17 +98,59 @@
             <input type="radio" id="ucdavisIRBNo" value="false" v-model="ucdavisIRB">
             <label for="ucdavisIRBNo">No</label>
         </div>
+
+        <div class="separator no-or-separator" />
+
+        <CanvasUniversitiesButton
+            :enabled="submitEnabledCanvas"
+            :buttonText=buttonText
+            @select="onSelectUniversity"
+        />
+        <span class="register-message">{{canvasMessage}}</span>
+
+        <div class="separator">
+            <span class="separator-text">or</span>
+        </div>
+
+        <div class="group">
+            <label for="new-user-username"> Username: </label>
+            <input id="new-user-username" type="text" v-model="newUser.username">
+        </div>
+
+        <div class="group">
+            <label for="new-user-first"> First name: </label>
+            <input id="new-user-first" type="text" v-model="newUser.first">
+        </div>
+
+        <div class="group">
+            <label for="new-user-last"> Last name: </label>
+            <input id="new-user-last" type="text" v-model="newUser.last">
+        </div>
+
+        <div class="group">
+            <label for="new-user-email"> Email: </label>
+            <input id="new-user-email" type="text" v-model="newUser.email">
+        </div>
+
+        <div class="group">
+            <label for="new-user-password"> Password: </label>
+            <input id="new-user-password" type="password" v-model="newUser.password">
+        </div>
+
+        <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
+
+        <span class="register-message">{{registerMessage}}</span>
     </div>
 </template>
 
 <script>
     import axios from "axios"
-    import CanvasSplitButton from './CanvasSplitButton.vue'
+    import CanvasUniversitiesButton from './CanvasUniversitiesButton.vue'
     import { eventBus } from "../../main"
 
     export default {
         name: "user-create",
-        components: { CanvasSplitButton },
+        components: { CanvasUniversitiesButton },
         data() {
             return {
                 selectedUniversity: null,
@@ -180,7 +180,6 @@
             submitEnabledCanvas: function() {
                 return this.nbIRB!== null
                         && ((this.needUCDIRB && this.ucdavisIRB!== null) || (!this.needUCDIRB))
-                        && (this.selectedUniversity != null)
             },
             needUCDIRB: function() {
                 return this.newUser.email.includes('@ucdavis.edu')
@@ -225,8 +224,9 @@
                     } 
                 }
             },
-            onSelectUniversity: function(university) {
+            onSelectUniversity: async function(university) {
                 this.selectedUniversity = university;
+                await this.createUserCanvas();
             },
             createUserCanvas: async function() {
                 try {
@@ -337,8 +337,8 @@
     color: #555;
     font-size: 14px;
   }
-  .before-reset {
-    margin: 15px 0px 10px 0px;
+  .no-or-separator{
+    margin: 15px 0px 15px 0px;
   }
 .form {
     width: 380px;
@@ -390,11 +390,14 @@ button.submit:enabled:hover {
     border-radius: 5px;
     padding: 5px;
     margin: 5px;
-    min-height: 300px;
-    max-height: 300px;
+    min-height: 200px;
+    max-height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
     font-size: 12px;
+}
+.register-message {
+    color: #cf000f;
 }
 .ucdavis-consent {
     margin: 10px 0 20px 0;
@@ -404,8 +407,8 @@ button.submit:enabled:hover {
     border-radius: 5px;
     padding: 5px;
     margin: 5px;
-    min-height: 300px;
-    max-height: 300px;
+    min-height: 200px;
+    max-height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
 }
