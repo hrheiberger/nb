@@ -307,13 +307,13 @@ router.post('/unlink-canvas', passport.authenticate('jwt', { session: false }), 
     if (!user) {
       return res.status(401).json({ msg: "Cannot find user"});
     }
+    if (user.isCanvasOnly()) {
+      return res.status(403).json({ msg: "Canvas only user"});
+    }
     user = await user.update({
       canvas_refresh_token: null,
       canvas_user_id: null,
     })
-    if (user.isCanvasOnly()) {
-      return res.status(403).json({ msg: "Canvas only user"});
-    }
     delete user.password;
     res.clearCookie('canvas_access_token');
     res.clearCookie('is_canvas_user');
