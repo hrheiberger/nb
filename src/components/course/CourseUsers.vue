@@ -47,8 +47,8 @@
       <button @click="addUser">Add</button>
     </div>
     <div class="reload">
-      <button @click="refresh">&#x21bb; Reload Table (if sections not all loaded)
-      </button>
+      <button @click="refresh">&#x21bb; Reload Table (if sections not all loaded) </button>
+      <button v-if="this.resyncCanvasCourseEnabled" @click="resync">&#x21bb; Resync with Canvas Roster</button>
     </div>
     <vue-good-table
         :columns="columns"
@@ -118,6 +118,8 @@
   Vue.use(VModal)
 
   Vue.component('downloadCsv', JsonCSV)
+
+  import axios from "axios";
 
   export default {
     name: 'course-users',
@@ -260,7 +262,10 @@
         return this.newUser.first.length > 0
           && this.newUser.last.length > 0
           && this.newUser.email.length > 0
-      }
+      },
+      resyncCanvasCourseEnabled: function() {
+        return this.course.canvas_id;
+      },
     },
     methods: {
       filterSuggestion: function(user, query) {
@@ -336,6 +341,19 @@
       },
       refresh() {
         this.$emit('refresh')
+      },
+      async resync() {
+        this.$isLoading(true);
+        const token = localStorage.getItem("nb.user");
+        const headers = { headers: { Authorization: 'Bearer ' + token }};
+        try {
+          await axios.post(`/api/classes/resync/${this.course.id}`, this.selectedCanvasCourse, headers);
+          this.refresh();
+        }
+        catch (err) {
+          console.error(`Error resyncing: ${err.response.data.msg}`);
+          this.$isLoading(false);
+        }
       },
       submitFile() {
         let formData = new FormData();
@@ -440,6 +458,9 @@
   .reload {
     text-align: right;
     font-family: Lucida Sans Unicode;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
   }
   .reload button {
     border-radius: 5px;

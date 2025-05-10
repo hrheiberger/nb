@@ -15,7 +15,7 @@ var upload = multer({ dest: 'uploads/' });
 const { Op } = require("sequelize");
 const EmailUtil = require('../utils/emailUtil')
 const { v4: uuidv4 } = require('uuid');
-const { refreshCanvasAccessToken } = require("./utils");
+const {addCanvasStudentToNbClass, getCanvasCourseStudents, refreshCanvasAccessToken, resyncCanvasCourse} = require("./canvas_utils");
 
 const router = express.Router();
 router.use(cookieParser());
@@ -54,19 +54,16 @@ router.post('/import', async (req, res) => {
   }
 
   // Retrieve user's Canvas access token from cookie
-  canvasAccessToken = req.cookies.canvas_access_token;
+  const user = await User.findByPk(req.user.id);
+  if (!user) {
+    return res.status(401).json({ msg: "Cannot find user"});
+  }
+  if (!user.canvas_refresh_token) {
+    return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+  }
+  const canvasAccessToken = await refreshCanvasAccessToken(user, res);
   if (!canvasAccessToken) {
-    const user = await User.findByPk(req.user.id);
-    if (!user) {
-      return res.status(401).json({ msg: "Cannot find user"});
-    }
-    if (!user.canvas_refresh_token) {
-      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
-    }
-    canvasAccessToken = await refreshCanvasAccessToken(user, res);
-    if (!canvasAccessToken) {
-      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
-    }
+    return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
   }
 
   // Create Canvas class
@@ -75,6 +72,7 @@ router.post('/import', async (req, res) => {
     const nb_class_no_section = await utils.createClass(name, req.user.id, course_id);
     nb_class = await Class.findByPk(nb_class_no_section.id, { include: [{ association: 'GlobalSection' }] });
   } catch (err) {
+    console.log(err);
     return res.status(500).json({msg: "class creation failed"})
   }
 
@@ -89,49 +87,45 @@ router.post('/import', async (req, res) => {
 
   // Add each student to the class
   for (const student of students) {
-    const profile = student.profile;
-    const role = student.enrollment_type;
-    const section = student.section;
-
-    // Get student NB profile
-    let user = await User.findOne({ where: { canvas_user_id: { [Op.iLike]: `${profile.id}` } } });
-    if (user === null) {
-      user = await User.findOne({ where: { username: { [Op.iLike]: profile.login_id.split('@')[0] } } });
-    }
-
-    // If user doesn't already exist -> register them first
-    if (user === null) { 
-      try {
-        user = await User.create({
-          username: profile.login_id.split('@')[0],
-          first_name: profile.sortable_name.split(', ')[1],
-          last_name: profile.sortable_name.split(', ')[0],
-          email: profile.primary_email.toLowerCase(),
-          password: "",
-          canvas_user_id: profile.id,
-        });
-      } catch (err) {} // Canvas user most likely already exists
-    }
-
-    if (role === "TeacherEnrollment") {
-      await nb_class.addInstructor(user);
-    }
-    else if (role === "TaEnrollment") {
-      await nb_class.addClassTAs(user);
-    }
-    else if (role === "StudentEnrollment") {
-      if (section) {
-        utils.addStudentToSection(nb_class, user, section);
-      } else {
-        utils.addStudent(nb_class.id, user.id);
-      }
-    }
-    else {
-      console.log(`Error: Import student not added: ${profile} with role ${role}`);
-    }
+    await addCanvasStudentToNbClass(nb_class, student);
   }
 
   res.status(200).json(nb_class);
+});
+
+
+/**
+ * Resync the roster of a Canvas imported class.
+ * @name POST/api/classes/resync/:id
+ * @param id: nb course_id
+ */
+router.post('/resync/:id', async (req, res) => {
+  // Retrieve 
+  let nb_course;
+  try {
+  nb_course = await Class.findByPk(req.params.id, {
+    include: [
+      { association: 'GlobalSection' },
+      {
+        model: User,
+        as: 'Instructors' 
+      },
+    ] 
+  });
+  } catch (err) {
+    console.log(err);
+    return res.status(400).json({msg: "invalid nb course id"})
+  }
+
+  // Resync the canvas imported class
+  try {
+    await resyncCanvasCourse(nb_course);
+    res.status(200).json({msg: "resync successful"});
+  }
+  catch (err) { 
+    console.log(err);
+    res.status(500).json({msg: "resync failed"});
+  }
 });
 
 /**
@@ -156,21 +150,19 @@ router.post('/edit', (req, res) => {
  */
 router.get('/canvas', async (req, res) => {
   try {
-    // Retrieve user's Canvas access token from cookie
-    canvasAccessToken = req.cookies.canvas_access_token;
-    if (!canvasAccessToken) {
-      const user = await User.findByPk(req.user.id);
-      if (!user) {
-        return res.status(401).json({ msg: "Cannot find user"});
-      }
-      if (!user.canvas_refresh_token) {
-        return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
-      }
-      canvasAccessToken = await refreshCanvasAccessToken(user, res);
-      if (!canvasAccessToken) {
-        return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
-      }
+    // Retrieve user's Canvas access token
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(401).json({ msg: "Cannot find user"});
     }
+    if (!user.canvas_refresh_token) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
+    const canvasAccessToken = await refreshCanvasAccessToken(user, res);
+    if (!canvasAccessToken) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
+    
 
     // Get courses from Canvas
     const response = await axios.get('https://canvas.mit.edu/api/v1/courses', {
@@ -196,57 +188,11 @@ router.get('/canvas', async (req, res) => {
   }
 });
 
-async function getCanvasCourseStudents(canvasAccessToken, course_id) {
-  // Fetch Canvas course sections
-  const sections = {};
-  const sections_response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${course_id}/sections`, {
-    headers: {
-      Authorization: `Bearer ${canvasAccessToken}`
-    },
-    params: {
-      per_page: 100, // TODO: Pagination could be handled here, though likely not needed
-    },
-  });
-  for (const section of sections_response.data) {
-    sections[section.id] = section.name;
-  }
-  
-  // Fetch Canvas course students
-  const enrollments_response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${course_id}/enrollments`, {
-    headers: {
-      Authorization: `Bearer ${canvasAccessToken}`
-    },
-    params: {
-      state: "active",
-      per_page: 100, // TODO: Pagination should be handled here
-    },
-  });
-
-  // Fetch student profiles
-  const students = [];
-  for (const enrollment of enrollments_response.data) {
-    const profile = (await axios.get(`https://canvas.mit.edu/api/v1/users/${enrollment.user.id}/profile`, {
-      headers: {
-        Authorization: `Bearer ${canvasAccessToken}`
-      },
-      params: {}
-    })).data;
-    students.push({
-      canvas_id: profile.id,
-      enrollment_type: enrollment.type,
-      section: `${sections[enrollment.course_section_id]}`,
-      profile: profile,
-    });
-  }
-
-  return students;
-}
-
 /**
  * Get all classes for which current user is an instructor.
  * @name GET/api/classes/instructor
  */
-router.get('/instructor', (req, res) => {
+router.get('/instructor', async (req, res) => {
   User.findByPk(req.user.id).then((user) =>
     user.getInstructorClasses()
   ).then((classes) => {

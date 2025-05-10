@@ -8,7 +8,7 @@ const transporter = require('../email-config');
 const { v4: uuidv4 } = require('uuid');
 const donenv = require('dotenv');
 const { Op } = require("sequelize");
-const { refreshCanvasAccessToken } = require("./utils");
+const { refreshCanvasAccessToken } = require("./canvas_utils");
 
 donenv.config();
 

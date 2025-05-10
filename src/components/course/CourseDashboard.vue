@@ -255,7 +255,9 @@ export default {
     },
     refreshUsers: function() {
       this.loadStudents();
+      this.loadTAs();
       this.loadInstructors();
+      this.$isLoading(false);
     },
     // openGrading: function(){
     //   this.$router.push("grading")

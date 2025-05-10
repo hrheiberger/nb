@@ -1,7 +1,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { canvasUniversities } = require('./utils');  
+const { canvasUniversities } = require('./canvas_utils');  
 
 /**
 * Get all Canvas-enabled universities
