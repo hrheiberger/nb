@@ -32,10 +32,19 @@
         <span class="label"> Deadline: </span>
         <datepicker v-model="date" :bootstrap-styling="true"></datepicker>
       </div>
-      <button :disabled="!submitEnabled || isGeneratingGrades" @click="createGrades">
-        {{isGeneratingGrades ? 'Generating...' : 'Generate Grades'}}
-      </button>
+      <div class="buttons">
+        <button :disabled="!submitEnabled || isGeneratingGrades" @click="generateGrades">
+          {{isGeneratingGrades ? 'Generating...' : 'Generate Grades'}}
+        </button>
+        <button :disabled="!downloadGradesEnabled || isGeneratingGrades" @click="downloadGrades">
+          Download Grades
+        </button>
+      </div>
     </div>
+
+    <hr>
+    <CsvGradeTable :gradesCsvString="gradesCsvString" />
+
   </div>
 </template>
 
@@ -51,11 +60,13 @@
   Vue.use(VModal)
 
   import GradeTable from './GradeTable.vue'
+  import CsvGradeTable from './CsvGradeTable.vue'
 
   export default {
     name: 'Grader',
     data() {
       return {
+        gradesCsvString: "",
         gradingSystems: [],
         sources: [],
         selectedGrading: null,
@@ -66,8 +77,11 @@
     },
     computed: {
       submitEnabled: function() {
-        return this.selectedGrading !== null && this.selectedSource !== null
-      }
+        return this.selectedGrading !== null && this.selectedSource !== null;
+      },
+      downloadGradesEnabled: function() {
+        return this.gradesCsvString !== "";
+      },
     },
     created: function() {
         try {
@@ -106,7 +120,7 @@
       })
     },
     methods: {
-      createGrades: function() {
+      generateGrades: async function() {
         this.isGeneratingGrades = true
         const url = this.sources[this.selectedSource].id === 'OVERALL' ? '/api/grades/all' : '/api/grades/grades' 
         const token = localStorage.getItem("nb.user");
@@ -120,8 +134,8 @@
                 classId: course.id
             }
         }
-        axios.get(url, config)
-        .then(res => {
+        try{
+          const res = await axios.get(url, config);
           var csv = 'Name,Email,Username,Total Comments,Total Words,Total Characters,Total Tags,Grade\n';
           res.data.forEach(function(row) {
             csv += row.name+",";
@@ -133,23 +147,35 @@
             csv += row.total_tags+",";
             csv += row.grade+"\n"
           });
-          let hiddenElement = document.createElement('a');
-          hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
-          hiddenElement.target = '_blank';
-          hiddenElement.download = 'grades.csv';
-          hiddenElement.click();
-          this.isGeneratingGrades = false
-        })
-      }
+          this.gradesCsvString = csv;
+          this.isGeneratingGrades = false;
+        } catch(err) {
+          console.log("Error generating grades...");
+        }
+      },
+      downloadGrades: function() {
+        let hiddenElement = document.createElement('a');
+        hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(this.gradesCsvString);
+        hiddenElement.target = '_blank';
+        hiddenElement.download = 'grades.csv';
+        hiddenElement.click();
+      },
     },
     components: {
+      CsvGradeTable,
+      Datepicker,
       GradeTable,
-      Datepicker
     }
   }
 </script>
 
 <style scoped>
+  .buttons {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+  }
   .grader {
     padding-top: 20px;
     overflow: scroll;
