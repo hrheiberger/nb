@@ -1,5 +1,6 @@
 const express = require('express');
 const Class = require('../models').Class;
+const User = require('../models').User;
 const Source = require('../models').Source;
 const Annotation = require('../models').Annotation;
 const GradingSystem = require('../models').GradingSystem;
@@ -9,6 +10,10 @@ const Criteria = require('../models').Criteria;
 const Assignment = require('../models').Assignment;
 const router = express.Router();
 const h2p = require('html2plaintext');
+const {refreshCanvasAccessToken} = require("./canvas_utils");
+const { Op } = require('sequelize');
+const { Sequelize } = require('sequelize');
+const axios = require('axios');
 
 /**
  * Get grading systems of a class.
@@ -385,6 +390,111 @@ router.get('/grades', (req, res) => {
     });
 });
 
+});
+
+/**
+ * Upload NB course grades to the instructor's chosen Canvas assignment
+ * @name POST/api/grades/upload
+ * @param canvas_course_id: Canvas course_id of the Canvas-imported NB course
+ * @param assignment_id: Chosen Canvas assignment_id to submit grades to
+ * @param grades: Array of student grade objects to upload
+ */
+router.post('/upload', async (req, res) => {
+  // Verify params
+  const canvas_course_id = req.body.canvas_course_id;
+  const assignment_id = req.body.assignment_id;
+  let grades = req.body.grades;
+  if (!canvas_course_id) {
+    return res.status(400).json({ msg: "bad canvas_course_id" });
+  } 
+  else if (!assignment_id) {
+    return res.status(400).json({ msg: "bad assignment_id" });
+  } 
+  else if (!grades) {
+    return res.status(400).json({ msg: "bad grades" });
+  }
+  grades = grades.filter(grade => grade["Email"] && grade["Grade"]);
+
+  // Retrieve user's Canvas access token from cookie
+  const user = await User.findByPk(req.user.id);
+  if (!user) {
+    return res.status(401).json({ msg: "Cannot find user"});
+  }
+  if (!user.canvas_refresh_token) {
+    return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+  }
+  const canvasAccessToken = await refreshCanvasAccessToken(user, res);
+  if (!canvasAccessToken) {
+    return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+  }
+
+  // Retrieve canvas_user_ids for all students with grades
+  const emails = grades.map(grade => grade["Email"].toLowerCase());
+  let students = [];
+  try {
+    students = await User.findAll({
+      where: { email: { [Op.iLike]: { [Op.any]: emails } } }
+    });
+  } catch (error) {
+    console.error('Error retrieving students from database:', error);
+  }
+  const studentEmailToCanvasUserId = new Map();
+  students.forEach(student => {
+    if (student.canvas_user_id) {
+      studentEmailToCanvasUserId.set(student.email.toLowerCase(), student.canvas_user_id);
+    }
+  });
+
+  // Build grade_data to upload
+  // Note: Students that don't have their NB account linked to Canvas won't be included in grade_data
+  //      and will be returned in ungraded_students
+  const grade_data = {};
+  const ungraded_students = [];
+  for (const grade of grades) {
+    const email = grade["Email"].toLowerCase();
+    const canvas_user_id = studentEmailToCanvasUserId.get(email);
+    if (!canvas_user_id) {
+      ungraded_students.push({
+        email: email,
+        name: grade["Name"],
+        grade: grade["Grade"],
+      });
+    } 
+    else {
+      grade_data[canvas_user_id] = {
+        posted_grade: grade["Grade"],
+        //posted_grade: `${(parseFloat(grade["Grade"])/4)*100}%`, // Express grade as a percentage out of 4 points
+      }
+    }
+  };
+
+  // Upload grades to Canvas
+  if (Object.keys(grade_data).length != 0) {
+    try {
+      // Build form data
+      const formData = new URLSearchParams();
+      for (const [canvas_user_id, grade] of Object.entries(grade_data)) {
+        formData.append(`grade_data[${canvas_user_id}][posted_grade]`, grade.posted_grade);
+      }
+      
+      // Submit grade update
+      await axios.post(
+        `https://canvas.mit.edu/api/v1/courses/${canvas_course_id}/assignments/${assignment_id}/submissions/update_grades`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${canvasAccessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Error uploading grades to Canvas:', error);
+      return res.status(500).json({ msg: 'Error uploading grades to Canvas' });
+    }
+  }
+  
+  res.status(200).json(ungraded_students);
 });
 
 

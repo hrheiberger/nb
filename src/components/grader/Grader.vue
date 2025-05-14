@@ -5,7 +5,7 @@
         :gradingSystem="gradingSystems[selectedGrading]">
     </grade-table>
 
-    <div class="settings">
+    <div class="settings first">
       <div class="group">
         <span class="label"> Grading System: </span>
         <select v-model="selectedGrading">
@@ -41,7 +41,24 @@
         </button>
       </div>
     </div>
-
+    <div v-if="canvasEnabled" class="settings">
+      <div class="group">
+        <span class="label"> Canvas Assignment: </span>
+        <v-select
+              :options="assignments"
+              :reduce="assignment => assignment.value"
+              v-model="selectedAssignment"
+              placeholder=""
+              :clearable="true"
+              class="v-select-custom"
+        ></v-select>  
+      </div>   
+      <div class="buttons">
+          <button :disabled="!uploadGradesEnabled || isGeneratingGrades" @click="uploadGrades">
+            Upload Grades
+          </button> 
+      </div>
+    </div>
     <hr>
     <CsvGradeTable :gradesCsvString="gradesCsvString" />
 
@@ -50,11 +67,14 @@
 
 <script>
   import axios from 'axios'
+  import Papa from 'papaparse';
   import Vue from 'vue'
   import VTooltip from 'v-tooltip'
   import VModal from 'vue-js-modal'
   import Datepicker from 'vuejs-datepicker';
   import { jwtDecode } from 'jwt-decode';
+  import vSelect from 'vue-select'
+  import 'vue-select/dist/vue-select.css'
 
   Vue.use(VTooltip)
   Vue.use(VModal)
@@ -64,9 +84,15 @@
 
   export default {
     name: 'Grader',
+    props: {
+      course: Object
+    },
     data() {
       return {
         gradesCsvString: "",
+        assignments: [],
+        ungradedUsers: [],
+        selectedAssignment: null,
         gradingSystems: [],
         sources: [],
         selectedGrading: null,
@@ -82,6 +108,12 @@
       downloadGradesEnabled: function() {
         return this.gradesCsvString !== "";
       },
+      canvasEnabled: function() {
+        return this.course.canvas_id;
+      },
+      uploadGradesEnabled: function() {
+        return this.downloadGradesEnabled && this.selectedAssignment !== null;
+      }
     },
     created: function() {
         try {
@@ -99,10 +131,12 @@
     },
     mounted: function() {
       const token = localStorage.getItem("nb.user");
-      const course = JSON.parse(localStorage.getItem('nb.current.course'))
       const config = { 
           headers: { Authorization: 'Bearer ' + token },
-          params: { classId: course.id }
+          params: { 
+            classId: this.course.id, 
+            canvasCourseId: this.course.canvas_id,
+          }
       }
       axios.get('/api/grades/gradingSystems', config).then(res => {
         this.gradingSystems = res.data
@@ -118,6 +152,16 @@
           this.selectedSource = 0 // defaults to the first one
         }
       })
+      
+      if (this.course.canvas_id) {
+        axios.get('/api/classes/assignments', config).then(res => {
+          const assignments = res.data;
+          this.assignments = assignments.map(assignment => ({
+            value: assignment.id,
+            label: assignment.name
+          }))
+        });
+      }
     },
     methods: {
       generateGrades: async function() {
@@ -160,11 +204,36 @@
         hiddenElement.download = 'grades.csv';
         hiddenElement.click();
       },
+      uploadGrades: async function() {
+        this.$isLoading(true);
+        const token = localStorage.getItem("nb.user");
+        const headers = { 
+            headers: { Authorization: 'Bearer ' + token },
+        }
+        const data = {
+          canvas_course_id: this.course.canvas_id,
+          assignment_id: this.selectedAssignment,
+          grades: Papa.parse(this.gradesCsvString, {header: true}).data
+        }
+
+        let ungradedStudents
+        try{
+          ungradedStudents = (await axios.post('/api/grades/upload', data, headers)).data;
+        } catch(err) {
+          console.log("Error uploading grades to Canvas...");
+        }
+        this.ungradedStudents = ungradedStudents;
+
+        // TODO: Display these ungraded students in a table
+
+        this.$isLoading(false);
+      },
     },
     components: {
       CsvGradeTable,
       Datepicker,
       GradeTable,
+      'v-select': vSelect,
     }
   }
 </script>
@@ -178,16 +247,21 @@
   }
   .grader {
     padding-top: 20px;
-    overflow: scroll;
+  }
+  .settings.first {
+    margin-top: 20px;
   }
   .settings {
-    margin-top: 20px;
+    margin-top: 10px;
     display: flex;
     justify-content: flex-end;
     align-items: center;
   }
   .settings .group {
     margin-right: 10px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
   }
   .settings .group select {
     font-size: 16px;
@@ -215,4 +289,13 @@
   .settings button:enabled:hover {
     background-color: #0069d9;
   }
+  .v-select.v-select-custom {
+  min-width: 180px;
+  font-size: 16px;
+  }
+  ::v-deep(.vs__dropdown-menu) {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 </style>

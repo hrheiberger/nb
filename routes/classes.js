@@ -188,6 +188,55 @@ router.get('/canvas', async (req, res) => {
   }
 });
 
+
+/**
+ * Get all Canvas assignments for the Canvas course with the provided course_id.
+ * @name GET/api/classes/assignments
+ * @param id: Canvas course_id
+ */
+router.get('/assignments', async (req, res) => {
+  // Verify params
+  const canvas_course_id = req.query.canvasCourseId;
+  if (!canvas_course_id) {
+    return res.status(400).json({ msg: "bad canvas course id" });
+  }
+
+  try {
+    // Retrieve user's Canvas access token
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(401).json({ msg: "Cannot find user"});
+    }
+    if (!user.canvas_refresh_token) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
+    const canvasAccessToken = await refreshCanvasAccessToken(user, res);
+    if (!canvasAccessToken) {
+      return res.status(401).json({ msg: 'Error: Missing Canvas access token' });
+    }
+    
+    // Get courses from Canvas
+    const response = await axios.get(`https://canvas.mit.edu/api/v1/courses/${canvas_course_id}/assignments`, {
+      headers: {
+        Authorization: `Bearer ${canvasAccessToken}`
+      },
+      params: {
+        per_page: 100, // TODO: Eventually handle pagination here
+      },
+    });
+
+    // Gather course info
+    const assignments = response.data.map(assignment => ({
+      id: assignment.id,
+      name: assignment.name,
+    }));
+    res.status(200).json(assignments);
+  } catch (error) {
+    console.error(`Error fetching Canvas assignments for course ${course_id}:`, error.response?.data || error.message);
+    res.status(500).json({ msg: `Failed to pull Canvas assignments for course ${course_id}` });
+  }
+});
+
 /**
  * Get all classes for which current user is an instructor.
  * @name GET/api/classes/instructor
