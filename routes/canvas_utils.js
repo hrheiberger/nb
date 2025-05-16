@@ -15,14 +15,14 @@ donenv.config();
  */
 const canvasUniversities = [
   {
-      name: "Massachusetts Institute of Technology", // Name shown on CanvasUniversitiesButton Dropdown
-      short_name: "MIT", // Name shown when university selected
+      name: "Massachusetts Institute of Technology", // Name displayed on the "Sign up/Sign in with Canvas" Dropdown
+      short_name: "MIT", // Name displayed when a university is selected
       canvas_url: "canvas.mit.edu", // Canvas URL for the university
   },
 ];
 
 /**
- * List of client secrets for Canvas-enabled universities
+ * List of Canvas Developer key client secrets for Canvas-enabled universities
  * NOTE: This is a static list and should be updated as needed
  */
 const canvasSecrets = {

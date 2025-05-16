@@ -137,8 +137,9 @@
             <input id="new-user-password" type="password" v-model="newUser.password">
         </div>
 
-        <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
-
+        <span class="tooltip-wrapper" :title="!submitEnabled ? 'Please answer the consent question above and fill all profile fields' : ''">
+            <button class="submit" :disabled="!submitEnabled" @click="createUser">Sign up</button>
+        </span>
         <span class="register-message">{{registerMessage}}</span>
     </div>
 </template>
@@ -314,7 +315,7 @@
 </script>
 
 <style scoped>
-  .separator {
+.separator {
     display: flex;
     margin-bottom: 10px;
     align-items: center;
@@ -324,22 +325,26 @@
     font-weight: bold;
     font-family: sans-serif;
     font-size: 14px;
-  }
-
-  .separator::before,
-  .separator::after {
+}
+.separator::before,
+.separator::after {
     content: "";
     flex: 1; /* lines take equal space */
     border-bottom: 2px solid #9e9e9e; 
-  }
-  .separator-text {
+}
+.separator-text {
     padding: 0 10px; /* Only space around the text */
     color: #555;
     font-size: 14px;
-  }
-  .no-or-separator{
+}
+.no-or-separator{
     margin: 15px 0px 15px 0px;
-  }
+}
+.tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+    align-self: flex-end;
+}
 .form {
     width: 380px;
     display: flex;

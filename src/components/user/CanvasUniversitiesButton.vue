@@ -1,21 +1,23 @@
 <template>
-    <b-button-group class="canvas-btn-group">
-    <b-dropdown
-      class="button-selector"
-      right
-      :disabled="!enabled"
-      :text="buttonText"
-    >
-        <b-dropdown-item-button disabled>Choose a supported university</b-dropdown-item-button>
-        <b-dropdown-item-button
-            v-for="university in universities"
-            :key="university.name"
-            @click="$emit('select', university)"
+    <span class="tooltip-wrapper" :title="!enabled ? 'Please answer the consent question above' : ''"> 
+      <b-button-group class="canvas-btn-group">
+        <b-dropdown
+          class="button-selector"
+          right
+          :disabled="!enabled"
+          :text="buttonText"
         >
-            {{ university.name }} 
-        </b-dropdown-item-button>      
-    </b-dropdown>
-    </b-button-group>
+            <b-dropdown-item-button disabled>Choose a supported university</b-dropdown-item-button>
+            <b-dropdown-item-button
+                v-for="university in universities"
+                :key="university.name"
+                @click="$emit('select', university)"
+            >
+                {{ university.name }} 
+            </b-dropdown-item-button>      
+        </b-dropdown>
+      </b-button-group>
+    </span>
   </template>
   
 <script>
@@ -66,6 +68,11 @@
     font-size: 16px;
     cursor: pointer;
   }
+  .button-selector ::v-deep .dropdown-toggle[disabled]{
+    cursor: not-allowed !important;
+    pointer-events: auto !important; /* allows cursor change */
+    opacity: 0.5;
+  }
   .button-text {
     white-space: nowrap;
     overflow: hidden;
@@ -74,5 +81,10 @@
     flex: 1 1 auto;
     min-width: 0;
     }
+  .tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+    align-self: flex-end;
+  }
 </style>
   

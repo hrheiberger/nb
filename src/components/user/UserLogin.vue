@@ -4,7 +4,6 @@
     <CanvasUniversitiesButton
       :enabled="true"
       :buttonText=buttonText
-      @main-click="loginCanvas"
       @select="onSelectUniversity"
     />
 
@@ -26,9 +25,11 @@
 
     <div v-if="message" class="message">{{ message }}</div>
 
-    <button class="submit" :disabled="!submitEnabled" @click="login">
-      Sign in
-    </button>
+    <span class="tooltip-wrapper" :title="!submitEnabled ? 'Please enter username and password' : ''">
+      <button class="submit" :disabled="!submitEnabled" @click="login">
+        Sign in
+      </button>
+    </span>
 
     <div class="separator before-reset" />
     
@@ -37,7 +38,9 @@
       <label for="login-email"> Email: </label>
       <input id="login-email" type="text" v-model="user.email">
     </div>
-    <button class="submit" :disabled="!forgotPasswordEnabled" @click="forgotPassword">Forgot Password</button>
+    <span class="tooltip-wrapper" :title="!forgotPasswordEnabled ? 'Please enter email' : ''">
+      <button class="submit" :disabled="!forgotPasswordEnabled" @click="forgotPassword">Forgot Password</button>
+    </span>
     <span class="forgot-password-message"><br>{{forgotPasswordMessage}}<br></span>
 
   </div>
@@ -256,6 +259,11 @@
   }
   button.submit:enabled:hover {
     background-color: #38155a;
+  }
+  .tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+    align-self: flex-end;
   }
 
 </style>
