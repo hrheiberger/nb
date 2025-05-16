@@ -264,7 +264,7 @@
           && this.newUser.email.length > 0
       },
       resyncCanvasCourseEnabled: function() {
-        return this.course.canvas_id;
+        return this.course.canvas_id && this.user.canvas_refresh_token;
       },
     },
     methods: {

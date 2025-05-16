@@ -85,6 +85,7 @@
   export default {
     name: 'Grader',
     props: {
+      user: Object,
       course: Object
     },
     data() {
@@ -109,7 +110,7 @@
         return this.gradesCsvString !== "";
       },
       canvasEnabled: function() {
-        return this.course.canvas_id;
+        return this.course.canvas_id && this.user.canvas_refresh_token;
       },
       uploadGradesEnabled: function() {
         return this.downloadGradesEnabled && this.selectedAssignment !== null;

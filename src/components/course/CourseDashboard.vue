@@ -34,7 +34,7 @@
       </course-users>
     </div>
     <div v-if="showGradesTab" class="grades-tab">
-      <Grader :course="course" />
+      <Grader :user="user" :course="course" />
     </div>
     <div v-if="showCourseSettingsTab" class="course-settings-tab">
       <CourseSettings :course="course" />
